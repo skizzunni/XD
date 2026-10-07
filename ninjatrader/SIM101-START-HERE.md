@@ -29,7 +29,7 @@ directory, open PowerShell **inside the extracted project folder** and run:
 
 ```powershell
 python windows_setup.py --ninjatrader-home 'D:\your actual NinjaTrader 8 folder' install
-python windows_setup.py --ninjatrader-home 'D:\your actual NinjaTrader 8 folder' dashboard --run-id p0-sim101-001
+python windows_setup.py --ninjatrader-home 'D:\your actual NinjaTrader 8 folder' dashboard --run-id r1-sim101-001
 ```
 
 The Python launcher avoids requiring execution of a PowerShell script. It does
@@ -61,9 +61,9 @@ not change Windows execution policy, and it does not connect or enable NinjaTrad
    | Property | Value |
    | --- | --- |
    | Account | **Sim101** |
-   | Strategy arm | **P0** |
+   | Strategy arm | **R1** |
    | Account stage | **Funded** |
-   | Paper run ID | **p0-sim101-001** |
+   | Paper run ID | **r1-sim101-001** |
    | Frozen calendar CSV | Your actual `Documents\NinjaTrader 8\MNQCalendar.csv` (installed by the launcher) |
    | Allow historical orders | **False** |
    | Use break-even protection | **True** |
@@ -79,21 +79,24 @@ not change Windows execution policy, and it does not connect or enable NinjaTrad
    `DATA_GAP` means the history/feed failed validation. Resolve those before
    expecting entries. Dates after October 9 require an updated reviewed calendar.
 
-P0 uses the first six closed cash-session five-minute bars to decide direction,
-tries an eligible entry at **15:30 ET**, and exits at **15:59 ET** or sooner on a
-stop/risk event. A below-threshold signal can produce no trade. Enable before
-09:30 ET for an uninterrupted first observed session; enabling partway through
-the session can block entries when complete required tick history is missing.
+R1 checks each completed five-minute bar for a fresh trend, countertrend pullback
+and breakout. It accepts qualifying setups from **10:00–15:45 ET** and has **no
+daily trade-count cap**. It keeps one open contract, a stop and a 1.5 R target;
+positions also exit after 30 minutes or by 15:55 ET. The cumulative session loss
+budget still applies. A normal loss does not automatically end the session.
+Scheduled releases pause entries from five minutes before until ten minutes
+after the release; an open R1 position is flattened when that pause begins.
 Keep NinjaTrader running and the connection healthy for its simulation orders.
+See [R1-SCANNER.md](R1-SCANNER.md) for exact filters, learning and restart rules.
 
 ## Read the dashboard and assess results
 
 The launcher opens the dashboard when native event logs exist. The watcher reads
-logs every five seconds; the browser page refreshes every fifteen seconds. A
+logs every five seconds; the browser page refreshes every five seconds. A
 page without completed trades can still show events explaining why the strategy
 is waiting or blocked. Keep **Paper run ID** identical in the strategy and
 watcher. Existing nonempty tick logs require a fresh run ID on a restart, e.g.
-`p0-sim101-002`; run `python windows_setup.py dashboard --run-id p0-sim101-002`
+`r1-sim101-002`; run `python windows_setup.py dashboard --run-id r1-sim101-002`
 to watch it. Session entry locks remain in place across run IDs.
 
 Orders/fills are visible immediately in Control Center **Orders/Executions**.

@@ -1,14 +1,15 @@
 from __future__ import annotations
 
 from dataclasses import asdict
-from datetime import timedelta
+from datetime import datetime, timedelta
 import hashlib
 import json
 import math
 
 from .broker import PaperBroker
+from .learning import QualityLearner
 from .models import Bar, TICK, TICK_VALUE, round_outward
-from .strategy import fvg_setup, momentum_direction
+from .strategy import fvg_setup, momentum_direction, rolling_setup
 
 
 class Engine:
@@ -28,6 +29,11 @@ class Engine:
         self.previous_close = None
         self.previous_contract = None
         self.finalized = False
+        self.learner = QualityLearner(
+            config.rolling_min_efficiency, config.adaptive_quality
+        )
+        self.last_exit_time = None
+        self.trade_sequence = 0
         self._reset_session()
 
     def _reset_session(self):
@@ -45,6 +51,10 @@ class Engine:
         self.bar_digest = hashlib.sha256()
         self.audit = None
         self.audit_last_tick = None
+        self.day_realized = 0.0
+        self.rolling_signal = None
+        self.learning_at_entry = None
+        self.active_order_id = None
 
     def log(self, tick_or_time, stage, reason, **details):
         ts = (
@@ -77,7 +87,7 @@ class Engine:
         self.atr = (
             sum(self.daily_ranges[-20:]) / 20 if len(self.daily_ranges) >= 20 else None
         )
-        reason = session.eligibility
+        reason = self._eligibility(session)
         self.blocked = reason != "ELIGIBLE"
         self.log(
             session.open,
@@ -92,6 +102,7 @@ class Engine:
         )
         if self.atr is None or self.atr <= 0:
             self.blocked = True
+
             self.log(
                 session.open,
                 "signal",
@@ -106,6 +117,15 @@ class Engine:
         ):
             self.blocked = True
 
+    def _eligibility(self, session):
+        if (
+            self.config.strategy == "R1"
+            and session.trade_enabled
+            and session.eligibility == "NEWS_WINDOW"
+        ):
+            return "ELIGIBLE"
+        return session.eligibility
+
     def _close_bar(self):
         if self.current_bar is None:
             return
@@ -115,6 +135,44 @@ class Engine:
             json.dumps(asdict(bar), default=str, sort_keys=True).encode()
         )
         self.current_bar = None
+        if (
+            self.config.strategy == "R1"
+            and not self.blocked
+            and not self.broker.position
+        ):
+            self.rolling_signal = None
+            self.attempted = False
+            if self.last_exit_time is None or bar.end > self.last_exit_time:
+                found = rolling_setup(
+                    self.bars,
+                    self.session,
+                    self.atr,
+                    self.config.rolling_momentum_threshold,
+                    self.config.rolling_min_efficiency,
+                )
+                if found:
+                    state = self.learner.state(found.direction, found.formed)
+                    if found.efficiency >= state["min_efficiency"]:
+                        self.rolling_signal = found
+                        self.learning_at_entry = state
+                        self.m = found.momentum
+                        self.log(
+                            bar.end,
+                            "signal",
+                            "LONG" if found.direction > 0 else "SHORT",
+                            setup="R1",
+                            efficiency=found.efficiency,
+                            min_efficiency=state["min_efficiency"],
+                            source_bars=[asdict(b) for b in self.bars[-6:]],
+                        )
+                    else:
+                        self.log(
+                            bar.end,
+                            "signal",
+                            "QUALITY_FILTER",
+                            efficiency=found.efficiency,
+                            **state,
+                        )
         if self.config.strategy == "C1" and not self.blocked and not self.setup_chosen:
             found = fvg_setup(self.bars, self.session, self.atr)
             if found:
@@ -183,7 +241,7 @@ class Engine:
             {
                 "session": str(s.day),
                 "complete": complete,
-                "eligibility": s.eligibility,
+                "eligibility": self._eligibility(s),
                 "atr20": self.atr,
                 "bar_checksum": self.bar_digest.hexdigest(),
                 "news_flags": s.news_flags,
@@ -310,7 +368,8 @@ class Engine:
             )
             # Stop wins a same-tick collision; different ticks preserve observed order.
             if pos.direction * (executable - pos.stop) <= 0:
-                self.blocked = True
+                if self.config.strategy != "R1":
+                    self.blocked = True
                 self._exit(tick, "EMERGENCY_STOP")
             elif (
                 pos.target is not None
@@ -321,9 +380,18 @@ class Engine:
                 15, 59 if self.config.strategy == "P0" else 55
             ):
                 self._exit(tick, "TIME_EXIT")
+            elif self.config.strategy == "R1" and session.news_paused(tick.timestamp):
+                self._exit(tick, "NEWS_EXIT")
+            elif (
+                self.config.strategy == "R1"
+                and tick.timestamp
+                >= datetime.fromisoformat(pos.entry_time) + timedelta(minutes=30)
+            ):
+                self._exit(tick, "HOLD_EXIT")
             elif (
                 self.config.daily_profit_target_usd
-                and pos.direction
+                and self.day_realized
+                + pos.direction
                 * (self.broker.quote(tick, -pos.direction)[0] - pos.entry_fill)
                 * 2
                 - self.config.round_turn_fees_usd
@@ -332,7 +400,8 @@ class Engine:
                 self.blocked = True
                 self._exit(tick, "DAILY_PROFIT_TARGET")
             elif (
-                pos.direction
+                self.day_realized
+                + pos.direction
                 * (self.broker.quote(tick, -pos.direction)[0] - pos.entry_fill)
                 * 2
                 - self.config.round_turn_fees_usd
@@ -366,11 +435,32 @@ class Engine:
             return
         if self.blocked or self.attempted:
             return
+        if self.config.strategy == "R1" and session.news_paused(tick.timestamp):
+            if self.rolling_signal:
+                self.attempted = True
+                self.log(tick, "risk", "NEWS_PAUSE")
+            return
+        if (
+            self.day_realized <= -self.config.session_loss_budget_usd
+            or self.config.daily_profit_target_usd
+            and self.day_realized >= self.config.daily_profit_target_usd
+        ):
+            self.blocked = True
+            self.log(tick, "risk", "DAILY_RISK_LIMIT")
+            return
         if self.config.strategy == "P0":
             if self.direction and session.at(15, 30) <= tick.timestamp < session.at(
                 15, 59
             ):
                 self._enter(tick, self.direction, previous)
+        elif self.config.strategy == "R1":
+            candidate = self.rolling_signal
+            if (
+                candidate
+                and candidate.formed <= tick.timestamp < candidate.expires
+                and tick.timestamp < session.at(15, 55)
+            ):
+                self._enter(tick, candidate.direction, previous, candidate.stop)
         elif self.setup:
             if tick.timestamp >= self.setup.expires:
                 self.attempted = True
@@ -390,7 +480,11 @@ class Engine:
         fill, reference = self.broker.quote(tick, direction)
         trigger = previous.price if previous else reference
         if c1_stop is not None:
-            trigger = self.setup.midpoint
+            trigger = (
+                self.rolling_signal.reference
+                if self.config.strategy == "R1"
+                else self.setup.midpoint
+            )
         adverse = max(0, direction * (fill - trigger) / TICK)
         if adverse > self.config.slippage_cap_ticks:
             self.log(
@@ -414,17 +508,21 @@ class Engine:
         )
         if (
             risk_ticks <= 0
+            or self.config.strategy == "R1"
+            and risk_ticks * TICK > 0.20 * self.atr
             or c1_stop is not None
             and risk_ticks < 2 * actual_cost_floor
         ):
-            self.blocked = True
+            self.blocked = self.config.strategy != "R1"
             self.log(tick, "order", "REJECTED", detail="INITIAL_RISK_BELOW_COST_FLOOR")
             return
         if (
-            risk_ticks * TICK_VALUE + self.config.round_turn_fees_usd
-            > self.config.session_loss_budget_usd
+            risk_ticks * TICK_VALUE
+            + self.config.round_turn_fees_usd
+            + self.config.slippage_ticks_per_side * TICK_VALUE
+            > self.config.session_loss_budget_usd + min(0, self.day_realized)
         ):
-            self.blocked = True
+            self.blocked = self.config.strategy != "R1"
             self.log(
                 tick,
                 "order",
@@ -437,7 +535,7 @@ class Engine:
             self.config.break_even_trigger_r
             and self.config.break_even_trigger_r * risk_ticks <= actual_cost_floor
         ):
-            self.blocked = True
+            self.blocked = self.config.strategy != "R1"
             self.log(tick, "order", "REJECTED", detail="BREAK_EVEN_TRIGGER_BELOW_COSTS")
             return
         target = None
@@ -446,7 +544,9 @@ class Engine:
             target = round_outward(
                 fill + direction * 1.5 * risk_ticks * TICK, -direction
             )
-        oid = f"{self.session.day}:{self.config.strategy}:entry"
+        self.trade_sequence += 1
+        oid = f"{self.session.day}:{self.config.strategy}:entry:{self.trade_sequence}"
+        self.active_order_id = oid
         self.log(
             tick,
             "order",
@@ -476,10 +576,19 @@ class Engine:
             "min_net_ticks": initial_net,
             "observed_ticks_in_trade": 1,
             "quoted_entry": tick.bid is not None,
-            "calendar_reason": self.session.eligibility,
+            "calendar_reason": self._eligibility(self.session),
             "stop_implementation": "local paper engine; no broker server",
             "fill_implementation": "deterministic tick simulation",
             "position_quantity": 1,
+            "day_realized_before": self.day_realized,
+            "order_id": oid,
+            "learning_at_entry": self.learning_at_entry,
+            "rolling_efficiency": self.rolling_signal.efficiency
+            if self.rolling_signal
+            else None,
+            "setup_formed": self.rolling_signal.formed.isoformat()
+            if self.rolling_signal
+            else None,
         }
         self.audit_last_tick = (tick.contract, tick.tick_id)
         self.log(
@@ -507,7 +616,7 @@ class Engine:
             tick,
             "order",
             "SUBMITTED",
-            order_id=f"{self.session.day}:{self.config.strategy}:exit",
+            order_id=f"{self.active_order_id}:exit",
             quantity=1,
             detail=reason,
             bid=tick.bid,
@@ -515,6 +624,10 @@ class Engine:
         )
         trade = self.broker.exit(tick, self.session, reason)
         self.trades.append(trade)
+        self.day_realized += trade.net_ticks * TICK_VALUE
+        if self.audit:
+            self.audit["day_realized_after"] = self.day_realized
+        self.last_exit_time = tick.timestamp
         self.trade_audits.append(self.audit or {})
         self.log(tick, "exit", reason, **asdict(trade))
         if trade.net_ticks < 0:
@@ -525,6 +638,42 @@ class Engine:
                 trade_number=len(self.trades),
                 net_ticks=trade.net_ticks,
             )
+        if (
+            self.config.strategy == "R1"
+            and not self.quality_fault
+            and reason != "FAULT_EXIT"
+        ):
+            self.learner.record(
+                self.active_order_id,
+                tick.timestamp,
+                trade.direction,
+                trade.net_ticks * TICK_VALUE,
+            )
+            self.log(
+                tick,
+                "learning",
+                "ADAPTATION_UPDATE",
+                **self.learner.state(
+                    trade.direction, tick.timestamp + timedelta(microseconds=1)
+                ),
+            )
+        elif self.config.strategy == "R1":
+            self.log(
+                tick,
+                "learning",
+                "QUALITY_SAMPLE_EXCLUDED",
+                detail="Data/order faults count toward risk, but do not train the entry filter",
+            )
+        if self.config.strategy == "R1":
+            self.rolling_signal = None
+        if (
+            self.day_realized <= -self.config.session_loss_budget_usd
+            or self.config.daily_profit_target_usd
+            and self.day_realized >= self.config.daily_profit_target_usd
+            or reason
+            in {"FAULT_EXIT", "TIME_EXIT", "LOSS_BUDGET_EXIT", "DAILY_PROFIT_TARGET"}
+        ):
+            self.blocked = True
         self.audit = None
 
     def _mark_audit(self, tick):

@@ -1,8 +1,11 @@
 # MNQ strategy research and paper bot
 
-Implements the supplied revised MNQ plan: **P0 session-open momentum** is the primary;
-**C1 fair value gap** is an independent challenger. One contract and one entry per
-session. No real-account order route is implemented.
+**R1 continuous intraday scanning** is the default paper strategy requested after
+the original plan. It has no daily trade-count cap, keeps one open contract, and
+uses a bounded quality filter based on completed trade outcomes. **P0 session-open
+momentum** and **C1 fair value gap** preserve the original single-entry plan for
+comparison. No real-account order route is implemented. See [the R1 rules and
+live dashboard guide](ninjatrader/R1-SCANNER.md).
 
 The Python engine runs on Python 3.12+ with a pinned IANA `tzdata` package for
 Windows time zone support. The
@@ -22,12 +25,12 @@ connect your market-data feed and enable the strategy on Sim101.
 python -m pip install --require-hashes --only-binary=:all: -r requirements.txt
 python -m unittest discover -v
 python main.py demo --out runs/my-demo
-python main.py dashboard --run runs/my-demo/P0 --out runs/dashboard.html
+python main.py dashboard --run runs/my-demo/R1 --out runs/dashboard.html
 ```
 
 Open `runs/dashboard.html` in a browser. It shows trades, equity, drawdown, account
 stage, events and 30 diagnostic questions for each loss. It refreshes the local
-file every 15 seconds; no web service or account credentials are needed.
+file every 5 seconds; no web service or account credentials are needed.
 
 ## Account stages
 
@@ -37,6 +40,9 @@ loss budget, and break-even protection after 1 initial R of favorable movement.
 do not connect a brokerage account. Loss budgets are containment settings; gaps
 and slippage can produce a larger loss. Break-even is estimated net of fees and
 exit slippage, and cannot guarantee a non-losing fill.
+R1 counts fees and realized results cumulatively across trades, reserves new stop
+risk against the remaining budget, and can trade a later fresh setup after a
+normal loss. Data/order faults still block entries.
 
 ```bash
 python main.py accounts set my-evaluation --stage evaluation --loss-limit 100
@@ -100,7 +106,8 @@ complete historical news revision records.
 
 ```bash
 python main.py --config config.json replay --ticks data/ticks.csv --calendar data/calendar.json --out runs/baseline
-python main.py --config config.funded-paper.json replay --ticks data/ticks.csv --calendar data/calendar.json --out runs/funded
+python main.py --config config.funded-paper.json replay --strategy P0 --ticks data/ticks.csv --calendar data/calendar.json --out runs/funded-p0
+python main.py --config config.funded-paper.json replay --strategy R1 --ticks data/ticks.csv --calendar data/calendar.json --out runs/funded
 python main.py review --run runs/funded
 ```
 
@@ -120,9 +127,11 @@ order ledger and a separate 30-question loss-review CSV.
 The learning queue groups recurring flags and proposes frozen threshold-grid,
 break-even-overlay, and C1 comparisons. It requires at least 30 observations to
 recommend experiments. It never changes active trading rules from one loss.
-This prevents a loss review from becoming an undocumented optimization loop.
-Automatic strategy promotion and unconstrained strategy generation are not
-implemented; changes need the chronological research gates and forward evidence.
+R1 additionally records a fixed adaptation policy: eight eligible completed
+outcomes per direction can tighten the trend-efficiency filter, without changing
+quantity or risk limits. Faulted outcomes are excluded from quality training.
+This paper adaptation is logged and unvalidated; automatic strategy promotion
+and unconstrained strategy generation remain absent.
 
 ## Locked research
 
@@ -152,7 +161,7 @@ research work; none has passed on actual data yet. Never retune a failed holdout
 ## NinjaTrader
 
 Follow [the Windows setup and dashboard guide](ninjatrader/SETUP.md).
-Import `MNQPlanPaper`, choose **Arm=P0** and **Account stage=Funded**, and use
+Import `MNQPlanPaper`, choose **Arm=R1** and **Account stage=Funded**, and use
 `Sim101` or `Playback101`. Keep C1 as a separate replay comparison. Funded/evaluation
 classification applies separately to each strategy instance's selected account.
 Live/account API adapters are absent. A two-day screenshot does not establish

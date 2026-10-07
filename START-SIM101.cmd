@@ -13,7 +13,7 @@ echo.
 echo Next: compile in NinjaTrader with F5, connect live market data, and configure Sim101.
 echo Read ninjatrader\SIM101-START-HERE.md for the exact settings.
 echo Keep this window open for the dashboard.
-python windows_setup.py dashboard --run-id p0-sim101-001
+python windows_setup.py dashboard --run-id r1-sim101-001
 if errorlevel 1 goto failed
 exit /b 0
 :failed

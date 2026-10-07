@@ -16,7 +16,7 @@ using NinjaTrader.NinjaScript;
 namespace NinjaTrader.NinjaScript.Strategies
 {
     public enum MNQPaperStage { Funded, Evaluation }
-    public enum MNQPaperArm { P0, C1 }
+    public enum MNQPaperArm { P0, C1, R1 }
 
     public class MNQPlanPaper : Strategy
     {
@@ -27,11 +27,26 @@ namespace NinjaTrader.NinjaScript.Strategies
             public string Contract, NewsFlags;
             public bool Roll, LateNews;
             public bool TradeEnabled = true;
+            public List<Tuple<TimeSpan,TimeSpan>> NewsWindows = new List<Tuple<TimeSpan,TimeSpan>>();
         }
         private class Candle
         {
             public DateTime End;
             public double Open, High, Low, Close;
+        }
+        private class ResultSample
+        {
+            public string Id, Arm;
+            public DateTime ClosedAt;
+            public int Direction;
+            public double Net;
+            public bool QualityEligible;
+        }
+        private class QualityState
+        {
+            public int Count;
+            public double Net, Minimum;
+            public bool Tightened;
         }
         private Dictionary<DateTime, SessionRule> calendar;
         private Dictionary<DateTime, List<Candle>> candles;
@@ -57,6 +72,12 @@ namespace NinjaTrader.NinjaScript.Strategies
         private HashSet<string> executionIds;
         private System.Threading.Timer heartbeat;
         private bool staleFaultRaised;
+        private bool ownershipDenied, entrySubmissionPending;
+        private FileStream ownerLease;
+        private string riskLedgerPath;
+        private List<ResultSample> results;
+        private DateTime entryTime, lastExitTime, lastStatusTime;
+        private double rollingReference, rollingEfficiency, entryQualityMinimum;
 
         [NinjaScriptProperty]
         [Display(Name="Account stage", GroupName="Account", Order=0)]
@@ -64,6 +85,15 @@ namespace NinjaTrader.NinjaScript.Strategies
         [NinjaScriptProperty]
         [Display(Name="Strategy arm", GroupName="Strategy", Order=0)]
         public MNQPaperArm Arm { get; set; }
+        [NinjaScriptProperty, Range(0.001, 1.0)]
+        [Display(Name="R1 rolling momentum / ATR", GroupName="Strategy", Order=3)]
+        public double RollingMomentumThreshold { get; set; }
+        [NinjaScriptProperty, Range(0.01, 0.85)]
+        [Display(Name="R1 minimum trend efficiency", GroupName="Strategy", Order=4)]
+        public double RollingMinEfficiency { get; set; }
+        [NinjaScriptProperty]
+        [Display(Name="R1 adaptive quality filter", GroupName="Strategy", Order=5)]
+        public bool AdaptiveQuality { get; set; }
         [NinjaScriptProperty, Range(1, 10000)]
         [Display(Name="Session loss limit ($)", GroupName="Account", Order=1)]
         public double SessionLossLimit { get; set; }
@@ -118,7 +148,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (State == State.SetDefaults)
             {
                 Name = "MNQPlanPaper";
-                Description = "P0 momentum / C1 challenger; one MNQ contract, paper accounts only.";
+                Description = "R1 continuous intraday scanner, P0 baseline / C1 challenger; one open MNQ contract, paper accounts only.";
                 Calculate = Calculate.OnBarClose;
                 EntriesPerDirection = 1;
                 EntryHandling = EntryHandling.AllEntries;
@@ -130,7 +160,10 @@ namespace NinjaTrader.NinjaScript.Strategies
                 BarsRequiredToTrade = 6;
                 Slippage = 1;
                 AccountStage = MNQPaperStage.Funded;
-                Arm = MNQPaperArm.P0;
+                Arm = MNQPaperArm.R1;
+                RollingMomentumThreshold = 0.05;
+                RollingMinEfficiency = 0.40;
+                AdaptiveQuality = true;
                 SessionLossLimit = 100;
                 EvaluationProfitTarget = 750;
                 UseBreakEven = true;
@@ -145,7 +178,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 PlatformTimeZoneId = "Eastern Standard Time";
                 CalendarFile = Path.Combine(NinjaTrader.Core.Globals.UserDataDir, "MNQCalendar.csv");
                 AllowHistoricalOrders = false;
-                PaperRunId = "forward-paper";
+                PaperRunId = "r1-sim101-001";
             }
             else if (State == State.Configure)
             {
@@ -166,12 +199,15 @@ namespace NinjaTrader.NinjaScript.Strategies
                 invalidDays = new HashSet<DateTime>();
                 ranges = new Queue<double>();
                 executionIds = new HashSet<string>();
+                results = new List<ResultSample>();
                 string folder = Path.Combine(NinjaTrader.Core.Globals.UserDataDir, "MNQPaper", Safe(PaperRunId));
                 Directory.CreateDirectory(folder);
                 string label = Safe((Account == null ? "Analyzer" : Account.Name) + "_" + Instrument.FullName + "_" + Arm);
                 ledgerPath = Path.Combine(folder, label + "_events.csv");
                 tickPath = Path.Combine(folder, label + "_ticks.csv");
                 reviewPath = Path.Combine(folder, label + "_loss_reviews.csv");
+                riskLedgerPath = Path.Combine(NinjaTrader.Core.Globals.UserDataDir,"MNQPaper","risk-history",
+                    Safe((Account==null?"Analyzer":Account.Name)+"_"+Instrument.FullName)+".csv");
                 if (!File.Exists(ledgerPath))
                     File.WriteAllText(ledgerPath, "sequence,timestamp,account,stage,arm,reason,details\n");
                 if (!File.Exists(tickPath))
@@ -184,7 +220,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                 Log(NowEastern(), "CONFIGURATION", "calendar_sha256=" + calendarHash
                     + ";stage=" + AccountStage + ";costs_calibrated=" + CostsCalibrated
                     + ";loss_limit=" + F(SessionLossLimit) + ";break_even=" + UseBreakEven
-                    + ";thresholds=" + F(LongThreshold) + "/" + F(ShortThreshold));
+                    + ";thresholds=" + F(LongThreshold) + "/" + F(ShortThreshold)
+                    + ";arm="+Arm+";trade_count_cap="+(Arm==MNQPaperArm.R1?"none":"1")
+                    + ";rolling_momentum="+F(RollingMomentumThreshold)+";base_efficiency="+F(RollingMinEfficiency)+";adaptive="+AdaptiveQuality);
             }
             else if (State == State.Realtime)
             {
@@ -193,6 +231,23 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // Historical→Realtime never carries historical strategy positions into paper orders.
                 if (AllowHistoricalOrders)
                     throw new InvalidOperationException("Turn off AllowHistoricalOrders before forward simulation.");
+                AcquireOwnership();
+                if(!ownershipDenied)
+                {
+                    LoadResults();
+                    DateTime resume=Account.Name=="Sim101"?NowEastern():lastTickTime;
+                    dayRealized=results.Where(r=>r.ClosedAt.Date==day && r.ClosedAt<resume).Sum(r=>r.Net);
+                    if(dayRealized<=-SessionLossLimit || AccountStage==MNQPaperStage.Evaluation && dayRealized>=EvaluationProfitTarget) blocked=true;
+                    // Historical signals are discarded; require a fresh bar after resuming.
+                    if(Arm==MNQPaperArm.R1) { signalFrozen=false; attempted=true; lastExitTime=resume; }
+                    Log(resume,"RISK_RESTORED","day_net_usd="+F(dayRealized)+";observations="+results.Count);
+                    if(Arm==MNQPaperArm.R1) foreach(int d in new int[] { 1,-1 })
+                    {
+                        QualityState q=QualityFor(d,resume);
+                        Log(resume,"ADAPTATION_UPDATE","direction="+d+";observations="+q.Count+";recent_net_usd="+F(q.Net)
+                            +";min_efficiency="+F(q.Minimum)+";tightened="+q.Tightened+";rule=restored_completed_history");
+                    }
+                }
                 CheckStartup();
                 if(Account.Name=="Sim101") heartbeat=new System.Threading.Timer(o=>
                 {
@@ -214,6 +269,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             {
                 if(heartbeat!=null) { heartbeat.Dispose(); heartbeat=null; }
                 if(tickWriter!=null) { tickWriter.Flush(); tickWriter.Dispose(); tickWriter=null; }
+                if(ownerLease!=null) { ownerLease.Dispose(); ownerLease=null; }
                 Log(NowEastern(), "TERMINATED", "Inspect account orders/positions; do not assume a stopped process protects positions.");
             }
         }
@@ -271,16 +327,19 @@ namespace NinjaTrader.NinjaScript.Strategies
             using (SHA256 sha = SHA256.Create())
                 calendarHash = BitConverter.ToString(sha.ComputeHash(File.ReadAllBytes(path))).Replace("-", "").ToLowerInvariant();
             const string legacyHeader = "date,open_et,close_et,contract,roll_day,late_news,news_flags";
-            bool hasTradeEnabled = lines[1] == legacyHeader + ",trade_enabled";
+            bool hasNewsWindows=lines[1]==legacyHeader+",trade_enabled,news_windows";
+            bool hasTradeEnabled = hasNewsWindows || lines[1] == legacyHeader + ",trade_enabled";
             if (!hasTradeEnabled && lines[1] != legacyHeader)
                 throw new InvalidOperationException("Unexpected calendar header.");
+            if(Arm==MNQPaperArm.R1 && !hasNewsWindows)
+                throw new InvalidOperationException("R1 needs an updated calendar CSV including scheduled news_windows. Reinstall the new package calendar.");
             var result = new Dictionary<DateTime, SessionRule>();
             foreach (string line in lines.Skip(2))
             {
                 if (String.IsNullOrWhiteSpace(line)) continue;
                 // Contract identifiers and flags must not contain comma/quote characters.
                 string[] parts = line.Split(',');
-                if (parts.Length != (hasTradeEnabled ? 8 : 7)) throw new InvalidOperationException("Invalid calendar row: " + line);
+                if (parts.Length != (hasNewsWindows?9:hasTradeEnabled?8:7)) throw new InvalidOperationException("Invalid calendar row: " + line);
                 var rule = new SessionRule { Day = DateTime.ParseExact(parts[0], "yyyy-MM-dd", CultureInfo.InvariantCulture),
                     Open = TimeSpan.Parse(parts[1], CultureInfo.InvariantCulture), Close = TimeSpan.Parse(parts[2], CultureInfo.InvariantCulture),
                     Contract = parts[3], Roll = Boolean.Parse(parts[4]), LateNews = Boolean.Parse(parts[5]), NewsFlags = parts[6],
@@ -288,6 +347,14 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (rule.Day.DayOfWeek == DayOfWeek.Saturday || rule.Day.DayOfWeek == DayOfWeek.Sunday
                     || rule.Open != new TimeSpan(9,30,0) || rule.Close <= rule.Open || rule.Close > new TimeSpan(16,0,0))
                     throw new InvalidOperationException("Invalid calendar date/session.");
+                if(hasNewsWindows && parts[8]!="") foreach(string span in parts[8].Split('|'))
+                {
+                    string[] ends=span.Split('-');
+                    if(ends.Length!=2) throw new InvalidOperationException("Invalid news window.");
+                    TimeSpan start=TimeSpan.Parse(ends[0],CultureInfo.InvariantCulture),end=TimeSpan.Parse(ends[1],CultureInfo.InvariantCulture);
+                    if(start<rule.Open || end>rule.Close || start>=end) throw new InvalidOperationException("News window outside RTH.");
+                    rule.NewsWindows.Add(Tuple.Create(start,end));
+                }
                 result.Add(rule.Day, rule);
             }
             return result;
@@ -302,20 +369,21 @@ namespace NinjaTrader.NinjaScript.Strategies
             day = et.Date;
             session = calendar.ContainsKey(day) ? calendar[day] : null;
             attempted = signalFrozen = gapChosen = breakEvenArmed = exitPending = false;
-            direction = 0; dayRealized = 0; lastTickTime = DateTime.MinValue;
+            direction = 0; dayRealized = results.Where(r=>r.ClosedAt.Date==day && r.ClosedAt<et).Sum(r=>r.Net); lastTickTime = DateTime.MinValue;
             lastSignalEnd = DateTime.MinValue;
             staleFaultRaised=false;
             stopOrder = null; exitReason = "";
             atr = ranges.Count == 20 ? ranges.Average() : 0;
-            blocked = session == null || disconnected;
+            blocked = session == null || disconnected || ownershipDenied;
             string reason = "ELIGIBLE";
             if (session == null) reason = "UNRESOLVED_SESSION";
             else if (session.Close != new TimeSpan(16,0,0)) { reason = "EARLY_CLOSE"; blocked = true; }
             else if (session.Roll) { reason = "ROLL_DAY"; blocked = true; }
             else if (session.Contract != Instrument.FullName) { reason = "UNRESOLVED_CONTRACT"; blocked = true; }
-            else if (session.LateNews) { reason = "NEWS_WINDOW"; blocked = true; }
+            else if (session.LateNews && Arm!=MNQPaperArm.R1) { reason = "NEWS_WINDOW"; blocked = true; }
             else if (!session.TradeEnabled) { reason = "WARMUP_ONLY"; blocked = true; }
             if (atr <= 0) blocked = true;
+            if(dayRealized<=-SessionLossLimit || AccountStage==MNQPaperStage.Evaluation && dayRealized>=EvaluationProfitTarget) blocked=true;
             if (State == State.Realtime && OtherAccountPosition()) blocked = true;
             Log(et, reason, "atr20=" + F(atr) + ";contract=" + Instrument.FullName);
             if (atr <= 0) Log(et, "ATR_WARMUP", "Load 21+ completed RTH sessions with matching tick history/calendar.");
@@ -362,13 +430,21 @@ namespace NinjaTrader.NinjaScript.Strategies
             double ask = State == State.Realtime ? GetCurrentAsk() : 0;
             if (Volumes[1][0] <= 0 || price <= 0 || ((bid>0)!=(ask>0)) || (bid > 0 && ask > 0 && bid > ask)) { Fault(now,"DATA_QUALITY"); return; }
             tickWriter.WriteLine(Iso(now)+","+F(price)+","+F(Volumes[1][0])+","+Csv(Instrument.FullName)
-                +",nt-"+(++tickSequence)+","+(bid>0?F(bid):"")+","+(ask>0?F(ask):""));
+                +",nt-"+Safe(PaperRunId)+"-"+(++tickSequence)+","+(bid>0?F(bid):"")+","+(ask>0?F(ask):""));
             if(tickSequence%1000==0) tickWriter.Flush();
             if (lastTickTime != DateTime.MinValue && now < lastTickTime) { Fault(now,"BAD_TIMESTAMP"); return; }
             if ((lastTickTime == DateTime.MinValue && (now-day-session.Open).TotalSeconds > MaxTickGapSeconds)
                 || (lastTickTime != DateTime.MinValue && (now-lastTickTime).TotalSeconds > MaxTickGapSeconds)) Fault(now,"DATA_GAP");
             double before = previousPrice;
             previousPrice = price; lastTickTime = now;
+            if(State==State.Realtime && (lastStatusTime==DateTime.MinValue || (now-lastStatusTime).TotalSeconds>=5))
+            {
+                lastStatusTime=now; tickWriter.Flush();
+                double mark=direction>0?(bid>0?bid:price):(ask>0?ask:price);
+                double unrealized=openQuantity>0?direction*(mark-entryFill)*2-RoundTurnFees-SlippagePerSide*0.50:0;
+                Log(now,"LIVE_STATUS","price="+F(price)+";open_qty="+openQuantity+";unrealized_usd="+F(unrealized)
+                    +";day_net_usd="+F(dayRealized)+";blocked="+blocked+";entry_pending="+EntryInFlight()+";news_pause="+NewsPaused(now));
+            }
             if(entryOrder!=null && openQuantity==0 && now>=entryDeadline
                 && (entryOrder.OrderState==OrderState.Working || entryOrder.OrderState==OrderState.Accepted))
             { CancelOrder(entryOrder); Log(now,"MISSED","CAPPED_ENTRY_EXPIRED"); }
@@ -380,11 +456,14 @@ namespace NinjaTrader.NinjaScript.Strategies
                 double executable = direction > 0 ? (bid>0?bid:price) : (ask>0?ask:price);
                 // A native working stop is already active; if crossing occurs, do not race a market exit.
                 if (direction*(executable-stopPrice) <= 0) return;
-                double estimatedNet = dayRealized + direction*(executable-entryFill)*2 - RoundTurnFees - SlippagePerSide*0.50;
-                mfe=Math.Max(mfe,estimatedNet); mae=Math.Min(mae,estimatedNet); tradeTicks++;
+                double tradeNet=direction*(executable-entryFill)*2-RoundTurnFees-SlippagePerSide*0.50;
+                double estimatedNet = dayRealized + tradeNet;
+                mfe=Math.Max(mfe,tradeNet); mae=Math.Min(mae,tradeNet); tradeTicks++;
                 if (now.TimeOfDay >= new TimeSpan(15, Arm==MNQPaperArm.P0?59:55,0)) RequestExit(now,"TIME_EXIT");
+                else if(Arm==MNQPaperArm.R1 && NewsPaused(now)) RequestExit(now,"NEWS_EXIT");
                 else if (estimatedNet <= -SessionLossLimit) RequestExit(now,"LOSS_BUDGET_EXIT");
                 else if (AccountStage==MNQPaperStage.Evaluation && estimatedNet >= EvaluationProfitTarget) RequestExit(now,"DAILY_PROFIT_TARGET");
+                else if(Arm==MNQPaperArm.R1 && now>=entryTime.AddMinutes(30)) RequestExit(now,"HOLD_EXIT");
                 else if (UseBreakEven && !breakEvenArmed && direction*(executable-entryFill) >= BreakEvenTriggerR*initialRisk)
                 {
                     double cover=Math.Ceiling(RoundTurnFees/0.50+SlippagePerSide)*TickSize;
@@ -397,11 +476,15 @@ namespace NinjaTrader.NinjaScript.Strategies
                 }
                 return;
             }
-            if (blocked || attempted || !signalFrozen || direction==0) return;
+            if (blocked || attempted || !signalFrozen || direction==0 || EntryInFlight()) return;
+            if(Arm==MNQPaperArm.R1 && NewsPaused(now)) { attempted=true; Log(now,"NEWS_PAUSE","Fresh entries paused around a scheduled release."); return; }
+            if(dayRealized<=-SessionLossLimit || AccountStage==MNQPaperStage.Evaluation && dayRealized>=EvaluationProfitTarget)
+            { blocked=true; Log(now,"DAILY_RISK_LIMIT","day_net_usd="+F(dayRealized)); return; }
             if (State == State.Historical && !AllowHistoricalOrders) return;
             if (State == State.Realtime && !SimulationAccount()) { Fault(now,"NOT_SIMULATION_ACCOUNT"); return; }
             bool trigger = Arm==MNQPaperArm.P0
                 ? now.TimeOfDay >= new TimeSpan(15,30,0) && now.TimeOfDay < new TimeSpan(15,59,0)
+                : Arm==MNQPaperArm.R1 ? now>=gapFormed && now<gapExpires && now.TimeOfDay<new TimeSpan(15,55,0)
                 : now >= gapFormed && now < gapExpires && (direction>0?before>=gapMidpoint && price<gapMidpoint:before<=gapMidpoint && price>gapMidpoint);
             if (Arm==MNQPaperArm.C1 && now>=gapExpires) { attempted=true; Log(now,"MISSED","SETUP_EXPIRED"); return; }
             if (!trigger) return;
@@ -409,29 +492,63 @@ namespace NinjaTrader.NinjaScript.Strategies
             double market = direction>0 ? (ask>0?ask:price+Math.Ceiling(SpreadTicks/2.0)*TickSize)
                 : (bid>0?bid:price-Math.Floor(SpreadTicks/2.0)*TickSize);
             double expected = market+direction*SlippagePerSide*TickSize;
-            double reference = Arm==MNQPaperArm.P0?before:gapMidpoint;
+            double reference = Arm==MNQPaperArm.P0?before:Arm==MNQPaperArm.R1?rollingReference:gapMidpoint;
             if (Math.Max(0,direction*(expected-reference)/TickSize)>EntrySlippageCap) { Log(now,"MISSED","SLIPPAGE_CAP"); return; }
             double risk = Arm==MNQPaperArm.P0 ? Math.Ceiling(0.20*atr/TickSize)*TickSize : direction*(expected-gapStop);
             double cost=Math.Ceiling(RoundTurnFees/0.50+(bid>0&&ask>0?(ask-bid)/TickSize:SpreadTicks)+2*SlippagePerSide);
-            if (risk<=0 || Arm==MNQPaperArm.C1 && risk/TickSize<2*cost
-                || risk*2+RoundTurnFees>SessionLossLimit || UseBreakEven && BreakEvenTriggerR*risk/TickSize<=cost)
-            { blocked=true; Log(now,"REJECTED","INITIAL_RISK_OR_LOSS_BUDGET"); return; }
-            if (State==State.Realtime && (OtherAccountPosition() || !ClaimSession(now))) { blocked=true; return; }
+            if (risk<=0 || Arm!=MNQPaperArm.P0 && risk/TickSize<2*cost || Arm==MNQPaperArm.R1 && risk>0.20*atr
+                || risk*2+RoundTurnFees+SlippagePerSide*0.50>SessionLossLimit+Math.Min(0,dayRealized) || UseBreakEven && BreakEvenTriggerR*risk/TickSize<=cost)
+            { if(Arm!=MNQPaperArm.R1) blocked=true; Log(now,"REJECTED","INITIAL_RISK_OR_LOSS_BUDGET"); return; }
+            if(State==State.Realtime && OtherAccountPosition()) { blocked=true; Log(now,"ORPHAN_OR_EXTERNAL_POSITION","Entries blocked."); return; }
+            if(State==State.Realtime && !ClaimSession(now)) { if(Arm!=MNQPaperArm.R1) blocked=true; return; }
             submittedReference=reference;
             entryDeadline=now.AddSeconds(5);
             tickWriter.Flush();
             Log(now,"SUBMITTED","quantity=1;bid="+F(bid)+";ask="+F(ask));
             // A marketable capped limit enforces the chase cap at the actual simulated fill.
             double limit=Outward(reference+direction*EntrySlippageCap*TickSize,direction);
+            entrySubmissionPending=true;
             if(direction>0) EnterLongLimit(1,true,1,limit,"MNQ_ENTRY");
             else EnterShortLimit(1,true,1,limit,"MNQ_ENTRY");
         }
 
         private void EvaluateSignal(DateTime now)
         {
-            if (blocked || atr<=0 || signalFrozen) return;
+            if (blocked || atr<=0) return;
             List<Candle> list;
             if (!candles.TryGetValue(day,out list)) return;
+            if(Arm==MNQPaperArm.R1)
+            {
+                if(list.Count==0) return;
+                DateTime end=list[list.Count-1].End;
+                if(openQuantity>0 || EntryInFlight()) { lastSignalEnd=end; return; }
+                if(end<=lastSignalEnd) return;
+                lastSignalEnd=end; signalFrozen=false; attempted=false; direction=0;
+                if(list.Count<6 || end<=lastExitTime || end.TimeOfDay<new TimeSpan(10,0,0) || end.TimeOfDay>new TimeSpan(15,45,0)) return;
+                var window=list.Skip(list.Count-6).ToList();
+                for(int i=1;i<window.Count;i++) if(window[i-1].End.AddMinutes(5)!=window[i].End) return;
+                Candle a=window[3], b=window[4], c=window[5];
+                double change=c.Close-window[0].Open, m=change/atr;
+                int d=m>=RollingMomentumThreshold?1:m<=-RollingMomentumThreshold?-1:0;
+                double path=Math.Abs(window[0].Close-window[0].Open);
+                for(int i=1;i<window.Count;i++) path+=Math.Abs(window[i].Close-window[i-1].Close);
+                double efficiency=path>0?Math.Abs(change)/path:0, width=c.High-c.Low;
+                QualityState quality=QualityFor(d,end);
+                string reject=d==0?"WEAK_MOMENTUM":efficiency<quality.Minimum?"QUALITY_FILTER":width<=0 || width>0.25*atr?"BAR_RANGE":
+                    d*(b.Close-b.Open)>=0?"NO_PULLBACK":d>0?(c.Close<=Math.Max(a.High,b.High) || (c.Close-c.Low)/width<0.70?"NO_BREAKOUT":""):
+                    (c.Close>=Math.Min(a.Low,b.Low) || (c.High-c.Close)/width<0.70?"NO_BREAKOUT":"");
+                double stop=Outward(d>0?b.Low-TickSize:b.High+TickSize,d), risk=d*(c.Close-stop);
+                if(reject=="" && (risk<=0 || risk>0.20*atr)) reject="STOP_DISTANCE";
+                Log(end,"SCAN_RESULT","decision="+(reject==""?"SETUP":reject)+";efficiency="+F(efficiency)
+                    +";min_efficiency="+F(quality.Minimum)+";observations="+quality.Count+";momentum="+F(m));
+                if(reject!="") return;
+                direction=d; signalM=m; rollingReference=c.Close; gapStop=stop; rollingEfficiency=efficiency; entryQualityMinimum=quality.Minimum;
+                gapFormed=end; gapExpires=end.AddMinutes(5); signalFrozen=true;
+                Log(end,d>0?"LONG":"SHORT","setup=R1;formed="+Iso(end)+";reference="+F(c.Close)+";stop="+F(stop)
+                    +";efficiency="+F(efficiency)+";min_efficiency="+F(quality.Minimum));
+                return;
+            }
+            if(signalFrozen) return;
             if (Arm==MNQPaperArm.P0)
             {
                 if (now.TimeOfDay<new TimeSpan(10,0,0)) return;
@@ -470,13 +587,76 @@ namespace NinjaTrader.NinjaScript.Strategies
         }
         private bool ClaimSession(DateTime now)
         {
-            // Shared across strategy arms: at most one entry per account/instrument/session.
+            // R1 claims each distinct closed-bar setup; P0/C1 retain their baseline daily claim.
             string lockFolder=Path.Combine(NinjaTrader.Core.Globals.UserDataDir,"MNQPaper","entry-locks");
             Directory.CreateDirectory(lockFolder);
-            string path=Path.Combine(lockFolder,Safe(Account.Name+"_"+Instrument.FullName)+"_"+day.ToString("yyyyMMdd")+".entry");
+            string suffix=Arm==MNQPaperArm.R1?gapFormed.ToString("yyyyMMddHHmm")+"_R1":day.ToString("yyyyMMdd");
+            string path=Path.Combine(lockFolder,Safe(Account.Name+"_"+Instrument.FullName)+"_"+suffix+".entry");
             try { using(FileStream file=new FileStream(path,FileMode.CreateNew,FileAccess.Write))
                 { byte[] bytes=Encoding.UTF8.GetBytes(Iso(now)); file.Write(bytes,0,bytes.Length); } return true; }
-            catch(IOException) { Log(now,"REJECTED","SESSION_ALREADY_CLAIMED; do not delete an active run lock"); return false; }
+            catch(IOException) { Log(now,"REJECTED","SETUP_ALREADY_CLAIMED; preserved across run IDs"); return false; }
+        }
+        private bool EntryInFlight()
+        {
+            return entrySubmissionPending || entryOrder!=null && entryOrder.OrderState!=OrderState.Filled
+                && entryOrder.OrderState!=OrderState.Cancelled && entryOrder.OrderState!=OrderState.Rejected;
+        }
+        private bool NewsPaused(DateTime now)
+        {
+            return session!=null && session.NewsWindows.Any(w=>w.Item1<=now.TimeOfDay && now.TimeOfDay<w.Item2);
+        }
+        private void AcquireOwnership()
+        {
+            string folder=Path.Combine(NinjaTrader.Core.Globals.UserDataDir,"MNQPaper","owners");
+            Directory.CreateDirectory(folder);
+            string path=Path.Combine(folder,Safe(Account.Name+"_"+Instrument.FullName)+".lock");
+            try { ownerLease=new FileStream(path,FileMode.OpenOrCreate,FileAccess.ReadWrite,FileShare.None); }
+            catch(IOException) { ownershipDenied=blocked=true; Log(NowEastern(),"STRATEGY_ALREADY_RUNNING","Another instance owns this account/instrument."); }
+        }
+        private void LoadResults()
+        {
+            results.Clear();
+            Directory.CreateDirectory(Path.GetDirectoryName(riskLedgerPath));
+            const string header="trade_id,exit_et,arm,direction,net_usd,quality_eligible";
+            if(!File.Exists(riskLedgerPath)) { File.WriteAllText(riskLedgerPath,header+"\n"); return; }
+            string[] lines=File.ReadAllLines(riskLedgerPath);
+            if(lines.Length==0 || lines[0]!=header) throw new InvalidOperationException("Invalid persisted risk history; reconcile before enabling.");
+            var ids=new HashSet<string>();
+            foreach(string line in lines.Skip(1))
+            {
+                if(String.IsNullOrWhiteSpace(line)) continue;
+                string[] p=line.Split(',');
+                if(p.Length!=6 || !ids.Add(p[0])) throw new InvalidOperationException("Invalid or duplicate risk-history row.");
+                DateTime closed=TimeZoneInfo.ConvertTime(DateTimeOffset.Parse(p[1],CultureInfo.InvariantCulture),easternZone).DateTime;
+                int d=Int32.Parse(p[3],CultureInfo.InvariantCulture); double net=Double.Parse(p[4],CultureInfo.InvariantCulture);
+                if((d!=1 && d!=-1) || Double.IsNaN(net) || Double.IsInfinity(net)) throw new InvalidOperationException("Invalid risk-history numeric value.");
+                results.Add(new ResultSample { Id=p[0],ClosedAt=closed,Arm=p[2],Direction=d,Net=net,QualityEligible=Boolean.Parse(p[5]) });
+            }
+        }
+        private QualityState QualityFor(int d,DateTime asOf)
+        {
+            var recent=results.Where(r=>r.Arm=="R1" && r.QualityEligible && r.Direction==d && r.ClosedAt<asOf)
+                .OrderBy(r=>r.ClosedAt).ThenBy(r=>r.Id,StringComparer.Ordinal).Reverse().Take(8).ToList();
+            double net=recent.Sum(r=>r.Net);
+            bool tighten=AdaptiveQuality && recent.Count==8 && net<=0;
+            return new QualityState { Count=recent.Count,Net=net,Tightened=tighten,Minimum=Math.Min(0.90,RollingMinEfficiency+(tighten?0.15:0)) };
+        }
+        private void RecordResult(DateTime now,double net,string reason)
+        {
+            if(State!=State.Realtime) return;
+            if(ownerLease==null) { Fault(now,"RISK_HISTORY_NOT_OWNED"); return; }
+            string id=Convert.ToBase64String(Encoding.UTF8.GetBytes(tradeKey));
+            if(results.Any(r=>r.Id==id)) { Fault(now,"DUPLICATE_RESULT"); return; }
+            bool eligible=!invalidDays.Contains(now.Date) && !disconnected && reason!="FAULT_EXIT";
+            try { File.AppendAllText(riskLedgerPath,id+","+Iso(now)+","+Arm+","+direction+","+F(net)+","+eligible+"\n"); }
+            catch(IOException) { Fault(now,"RISK_HISTORY_WRITE_FAILED"); return; }
+            results.Add(new ResultSample { Id=id,ClosedAt=now,Arm=Arm.ToString(),Direction=direction,Net=net,QualityEligible=eligible });
+            if(Arm==MNQPaperArm.R1)
+            {
+                QualityState q=QualityFor(direction,now.AddTicks(1));
+                Log(now,"ADAPTATION_UPDATE","direction="+direction+";observations="+q.Count+";recent_net_usd="+F(q.Net)
+                    +";min_efficiency="+F(q.Minimum)+";tightened="+q.Tightened+";rule=eight_completed_trades");
+            }
         }
         private void PlaceStop()
         {
@@ -486,7 +666,7 @@ namespace NinjaTrader.NinjaScript.Strategies
         }
         private void RequestExit(DateTime now,string reason)
         {
-            blocked=true;
+            if(Arm!=MNQPaperArm.R1 || reason!="HOLD_EXIT" && reason!="NEWS_EXIT") blocked=true;
             if(openQuantity<=0 || exitPending) return;
             exitPending=true; exitReason=reason;
             Log(now,"SUBMITTED","exit="+reason+";quantity="+openQuantity);
@@ -505,23 +685,25 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             if(!executionIds.Add(executionId)) { Fault(Eastern(time),"DUPLICATE_EXECUTION"); return; }
             DateTime now=Eastern(time);
-            Log(now,"FILLED","execution_id="+executionId+";order_id="+orderId+";name="+execution.Name+";quantity="+quantity+";price="+F(price));
+            Log(now,"FILLED","execution_id="+executionId+";order_id="+orderId+";name="+execution.Name+";quantity="+quantity+";price="+F(price)+";direction="+direction);
             if(execution.Name=="MNQ_ENTRY")
             {
                 openQuantity+=quantity; entryFill=price;
+                entryTime=now; breakEvenArmed=false; exitPending=false; exitReason="";
                 tradeKey=(Account==null?"Analyzer":Account.Name)+":"+orderId;
                 stopEverAccepted=false; tradeTicks=0; mfe=mae=-RoundTurnFees;
                 initialRisk=Arm==MNQPaperArm.P0?Math.Ceiling(0.20*atr/TickSize)*TickSize:direction*(price-gapStop);
                 stopPrice=Arm==MNQPaperArm.P0?Outward(price-direction*initialRisk,direction):gapStop;
                 PlaceStop(); Log(now,"STOP_ACTIVE","price="+F(stopPrice)+";native_simulator_order=true");
-                if(Arm==MNQPaperArm.C1)
+                if(Arm!=MNQPaperArm.P0)
                 {
                     double target=Outward(price+direction*1.5*initialRisk,-direction);
                     if(direction>0) ExitLongLimit(1,true,openQuantity,target,"TARGET_EXIT","MNQ_ENTRY");
                     else ExitShortLimit(1,true,openQuantity,target,"TARGET_EXIT","MNQ_ENTRY");
                 }
-                if(openQuantity!=1 || initialRisk<=0 || initialRisk*2+RoundTurnFees>SessionLossLimit
-                    || Arm==MNQPaperArm.C1 && initialRisk/TickSize<2*Math.Ceiling(RoundTurnFees/0.50+SpreadTicks+2*SlippagePerSide))
+                if(openQuantity!=1 || initialRisk<=0 || initialRisk*2+RoundTurnFees+SlippagePerSide*0.50>SessionLossLimit+Math.Min(0,dayRealized)
+                    || Arm==MNQPaperArm.R1 && initialRisk>0.20*atr
+                    || Arm!=MNQPaperArm.P0 && initialRisk/TickSize<2*Math.Ceiling(RoundTurnFees/0.50+SpreadTicks+2*SlippagePerSide))
                     Fault(now,"UNEXPECTED_FILL_OR_RISK");
                 else if(direction*(price-submittedReference)/TickSize>EntrySlippageCap)
                     Fault(now,"FILL_EXCEEDED_SLIPPAGE_CAP");
@@ -531,10 +713,16 @@ namespace NinjaTrader.NinjaScript.Strategies
                 double net=direction*(price-entryFill)*2*quantity-RoundTurnFees*quantity;
                 dayRealized+=net; openQuantity-=quantity;
                 string reason=execution.Name;
-                if(reason=="EMERGENCY_STOP" || reason=="FAULT_EXIT") blocked=true;
+                if(reason=="FAULT_EXIT" || reason=="EMERGENCY_STOP" && Arm!=MNQPaperArm.R1) blocked=true;
                 Log(now,reason,"net_usd="+F(net)+";day_net_usd="+F(dayRealized)+";fees="+F(RoundTurnFees*quantity));
                 if(net<0) { WriteLossReview(now,reason,net,price); Log(now,"LOSS_RECORDED","trade_id="+tradeKey+";net_usd="+F(net)+";questions=30"); }
-                if(openQuantity<=0) { openQuantity=0; stopOrder=null; exitPending=false; }
+                RecordResult(now,net,reason);
+                if(dayRealized<=-SessionLossLimit || AccountStage==MNQPaperStage.Evaluation && dayRealized>=EvaluationProfitTarget) blocked=true;
+                if(openQuantity<=0)
+                {
+                    openQuantity=0; stopOrder=null; exitPending=false; entrySubmissionPending=false; entryOrder=null; lastExitTime=now;
+                    if(Arm==MNQPaperArm.R1) { signalFrozen=false; attempted=true; gapChosen=false; }
+                }
             }
         }
         protected override void OnOrderUpdate(Order order,double limitPrice,double stopPrice,int quantity,int filled,
@@ -542,12 +730,13 @@ namespace NinjaTrader.NinjaScript.Strategies
         {
             if(order.Name=="EMERGENCY_STOP") stopOrder=order;
             if(order.Name=="MNQ_ENTRY") entryOrder=order;
+            if(order.Name=="MNQ_ENTRY" && (orderState==OrderState.Filled || orderState==OrderState.Cancelled || orderState==OrderState.Rejected)) entrySubmissionPending=false;
             if(order.Name=="EMERGENCY_STOP" && (orderState==OrderState.Accepted || orderState==OrderState.Working)) stopEverAccepted=true;
             if(order.Name!="MNQ_ENTRY" && orderState==OrderState.Filled) exitPending=true;
             string code=orderState==OrderState.PartFilled?"PARTIAL":orderState==OrderState.Rejected?"REJECTED":orderState==OrderState.Cancelled?"CANCELLED":"ORDER_UPDATE";
             Log(Eastern(time),code,"order_id="+order.OrderId+";name="+order.Name+";state="+orderState+";filled="+filled+";error="+error+";native="+nativeError);
             if(orderState==OrderState.PartFilled || orderState==OrderState.Rejected || error!=ErrorCode.NoError)
-                blocked=true; // StopCancelClose handles native rejection cleanup; no silent resubmission.
+            { blocked=true; invalidDays.Add(Eastern(time).Date); } // StopCancelClose handles native rejection cleanup.
             if(order.Name=="EMERGENCY_STOP" && orderState==OrderState.Cancelled && openQuantity>0 && !exitPending)
                 Fault(Eastern(time),"STOP_CANCELLED");
         }
@@ -568,7 +757,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             Action<string,string,string> q=(question,answer,status)=>rows.Add(Csv(tradeKey)+","+Csv(Iso(now))+","+
                 Csv(Account==null?"Analyzer":Account.Name)+","+AccountStage+","+Arm+","+Csv(question)+","+Csv(answer)+","+status);
             q("Did the setup meet all mechanical criteria?","Configured entry guards passed; M="+F(signalM)+";ATR20="+F(atr),"info");
-            q("Was the signal based on completed bars?","Signals are read only from 5-minute BarsInProgress 0; orders use one-tick BarsInProgress 1.","info");
+            q("Was the signal based on completed bars?",Arm==MNQPaperArm.R1?"Six closed rolling bars; setup="+Iso(gapFormed)+";efficiency="+F(rollingEfficiency)+";required="+F(entryQualityMinimum):"P0 uses closed opening bars; C1 uses closed three-bar formation.","info");
             q("Was ATR20 lagged one session?","Prior completed-session queue; ATR20="+F(atr),"info");
             q("Was this a full RTH session?",session==null?"Unknown":session.Close.ToString(),session!=null&&session.Close==new TimeSpan(16,0,0)?"pass":"flag");
             q("Was prohibited late news excluded?",session==null?"Unknown":"late_news="+session.LateNews,"info");
@@ -583,20 +772,20 @@ namespace NinjaTrader.NinjaScript.Strategies
             q("Were actual commissions and fees calibrated?","calibrated="+CostsCalibrated+";round_trip_fees="+F(RoundTurnFees),CostsCalibrated?"pass":"unknown");
             q("Was spread observed in the fill path?","Use captured bid/ask and native fill ledger; historical quotes may be absent.","unknown");
             q("Did fees erase a non-losing fill result?","before_fees_usd="+F(net+RoundTurnFees),net+RoundTurnFees>=0?"flag":"info");
-            q("Was the pre-entry market trending or choppy?","Requires raw-tick or 5-minute-bar analysis; no discretionary label is assumed.","unknown");
+            q("Was the pre-entry market trending or choppy?",Arm==MNQPaperArm.R1?"Six-bar trend efficiency="+F(rollingEfficiency)+";minimum="+F(entryQualityMinimum):"Requires raw-tick or 5-minute-bar analysis; no discretionary label is assumed.",Arm==MNQPaperArm.R1?"info":"unknown");
             q("How large was the initial risk relative to ATR?","risk="+F(initialRisk)+";risk_to_atr="+F(atr>0?initialRisk/atr:0),"info");
             q("What was maximum adverse excursion?","observed_mae_net_usd="+F(Math.Min(mae,net)),"info");
             q("Was the trade profitable before losing?","observed_mfe_net_usd="+F(mfe),mfe>0?"flag":"info");
             q("Was break-even protection armed?","enabled="+UseBreakEven+";armed="+breakEvenArmed+";trigger_R="+F(BreakEvenTriggerR),"info");
             q("Did a stop gap or slippage defeat protection?","exit_fill="+F(exitPrice)+";stop="+F(stopPrice)+";adverse_stop_ticks="+F(Math.Max(0,direction*(stopPrice-exitPrice)/TickSize)),"info");
             q("Which exit mechanism realized this loss?",reason,"info");
-            q("Was a forbidden re-entry attempted?","Session entry lock is retained; inspect rejected/claim events.","info");
-            q("Did realized loss exceed the session budget?","loss="+F(-net)+";budget="+F(SessionLossLimit),-net>SessionLossLimit?"flag":"pass");
+            q("Was the setup fresh rather than a duplicate entry?",Arm==MNQPaperArm.R1?"Each closed-bar setup has a persistent claim; multiple distinct setups are allowed.":"Baseline session entry claim retained.","info");
+            q("Did cumulative realized loss exceed the session budget?","day_net_usd="+F(dayRealized)+";budget="+F(SessionLossLimit),-dayRealized>SessionLossLimit?"flag":"pass");
             q("Was the correct account stage selected?","stage="+AccountStage+";profit_target="+(AccountStage==MNQPaperStage.Evaluation?F(EvaluationProfitTarget):"none"),"info");
             q("Was the firm trailing-drawdown rule breached?","Firm limits and external account equity are not configured.","unknown");
             q("Did a manual override or another strategy interfere?","Use a dedicated Sim101/Playback101 run; external/manual order ownership is unverified.","unknown");
             q("Did latency, partial fill, reject or cancel contribute?","Reconcile native ORDER_UPDATE/PARTIAL/REJECTED/CANCELLED events and "+tradeTicks+" observed ticks.","unknown");
-            q("Would a proposed fix generalize to future data?","Unknown; log a paper experiment and require frozen validation/holdout/forward-sim gates. Active parameters are unchanged.","unknown");
+            q("Would a proposed fix generalize to future data?","Unknown; R1 logs bounded quality-filter changes using completed outcomes. Compare adaptive/fixed runs and future simulation results before claiming improvement.","unknown");
             File.AppendAllText(reviewPath,String.Join("\n",rows)+"\n");
         }
     }

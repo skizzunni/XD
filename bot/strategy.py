@@ -26,6 +26,71 @@ class FVG:
     width: float
 
 
+@dataclass(frozen=True)
+class RollingSetup:
+    direction: int
+    reference: float
+    stop: float
+    formed: object
+    expires: object
+    efficiency: float
+    momentum: float
+
+
+def rolling_setup(bars, session, atr, momentum_threshold=0.05, min_efficiency=0.40):
+    if len(bars) < 6 or atr <= 0:
+        return None
+    window = bars[-6:]
+    if any(a.end != b.start for a, b in zip(window, window[1:])):
+        return None
+    a, b, c = window[-3:]
+    if not session.at(10, 0) <= c.end <= session.at(15, 45):
+        return None
+    change = c.close - window[0].open
+    momentum = change / atr
+    direction = (
+        1
+        if momentum >= momentum_threshold
+        else -1
+        if momentum <= -momentum_threshold
+        else 0
+    )
+    path = abs(window[0].close - window[0].open) + sum(
+        abs(y.close - x.close) for x, y in zip(window, window[1:])
+    )
+    efficiency = abs(change) / path if path else 0
+    width = c.high - c.low
+    if (
+        direction == 0
+        or efficiency < min_efficiency
+        or width <= 0
+        or width > 0.25 * atr
+    ):
+        return None
+    if direction * (b.close - b.open) >= 0:
+        return None  # A closed countertrend pullback precedes the breakout.
+    if direction > 0:
+        if c.close <= max(a.high, b.high) or (c.close - c.low) / width < 0.70:
+            return None
+        stop = b.low - TICK
+    else:
+        if c.close >= min(a.low, b.low) or (c.high - c.close) / width < 0.70:
+            return None
+        stop = b.high + TICK
+    risk = direction * (c.close - stop)
+    if risk <= 0 or risk > 0.20 * atr:
+        return None
+    return RollingSetup(
+        direction,
+        c.close,
+        round_outward(stop, direction),
+        c.end,
+        c.end + timedelta(minutes=5),
+        efficiency,
+        momentum,
+    )
+
+
 def fvg_setup(bars, session, atr):
     if len(bars) < 3:
         return None

@@ -168,6 +168,8 @@ def engine_report(engine, synthetic=False):
             for s in engine.session_records
         ),
         "event_hash": engine.event_hash(),
+        "trade_count_cap": None if engine.config.strategy == "R1" else 1,
+        "learning_samples": len(engine.learner.samples),
         "decision": "SYNTHETIC_SMOKE_TEST_ONLY"
         if synthetic
         else "RESEARCH_GATES_NOT_YET_EVALUATED",
@@ -207,6 +209,7 @@ def write_run(engine, directory, provenance):
         directory / "paper_experiments.json", learning_queue(losses, len(engine.trades))
     )
     write_json(directory / "trade_audits.json", engine.trade_audits)
+    write_json(directory / "learning_state.json", engine.learner.samples)
     with (directory / "events.jsonl").open("w") as f:
         for event in engine.events:
             f.write(

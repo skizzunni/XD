@@ -1,6 +1,6 @@
 {
   "mode": "paper",
-  "strategy": "P0",
+  "strategy": "R1",
   "round_turn_fees_usd": 1.00,
   "spread_ticks": 1,
   "slippage_ticks_per_side": 1,

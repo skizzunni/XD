@@ -82,7 +82,7 @@ enabling still happen in NinjaTrader.
    ```
 
    It runs Python, reads the CSV logs every 5 seconds and opens `dashboard.html` in
-   your browser. The page refreshes every 15 seconds. If `python` is not on PATH,
+   your browser. The page refreshes every 5 seconds. If `python` is not on PATH,
    pass `-PythonExe 'C:\path\to\python.exe'`. If your Documents folder is relocated
    (e.g. OneDrive), pass `-NinjaTraderHome 'your actual NinjaTrader 8 folder'`.
    If PowerShell blocks the helper, use the Python command directly instead of

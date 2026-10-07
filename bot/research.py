@@ -68,6 +68,10 @@ def pbo(results, days, blocks=8):
 
 
 def prepare(ticks_path, calendar_path, config, directory):
+    if config.strategy == "R1":
+        raise ValueError(
+            "R1 adaptive scanning is an unvalidated paper experiment; the existing research family covers P0/C1 only"
+        )
     if config.daily_profit_target_usd or config.break_even_trigger_r:
         raise ValueError(
             "Research family is the baseline; evaluate account overlays in separate frozen runs"

@@ -6,7 +6,7 @@ available here; native compilation/playback and profitability are unverified.
 
 ## Checks completed
 
-- 54 automated tests: signal thresholds/freeze, ATR lag, Eastern/DST, early closes,
+- 70 automated tests: signal thresholds/freeze, ATR lag, Eastern/DST, early closes,
   rollover, news, bad/duplicate data, slippage caps, quote cost invariants,
   stop/time/target tick ordering, recovery reconstruction, unresolved-position
   preservation, account stages, net break-even/gap loss, research freeze/holdout
@@ -17,10 +17,20 @@ available here; native compilation/playback and profitability are unverified.
   qualifying setups in that broad fixture, so dedicated entry/stop/target tests
   exercise its execution paths. Synthetic P&L is not market evidence.
 - Repeated replay produced identical event hashes and trades.
+- R1's 400-session, 156,000-tick synthetic stress produced 4,560 closed trades,
+  with twelve trades per eligible session and no overlapping positions or reused
+  entry IDs. Two full runs had identical event hashes, trades and learning state.
+- R1 tests cover repeated long/short entries, re-entry after stops, cumulative
+  risk/targets, independent loss reviews, bounded quality tightening/recovery,
+  exclusion of faulted samples and future results, news pauses/flattening and
+  warmup-only dates. Prior poor outcomes change actual entry acceptance.
 - Python compilation and unused/unbound-name analysis passed.
 - C# grammar parsing passed; this does not verify NinjaTrader API bindings.
 - Dashboard JavaScript syntax and functional checks passed for summary cards,
   380 trade rows, a 76-row loss filter, equity chart and 30-question review display.
+- The current R1 dashboard also passed JavaScript syntax and DOM-harness checks
+  for live open P&L, learning state, counts and win/loss filtering. Browser/Windows
+  execution is still unrun. Native loss notifications no longer create fake exits.
 - The pinned, checksum-verified timezone package was tested with OS zone lookup
   disabled, matching Windows' need for packaged IANA time zones.
 
@@ -54,6 +64,12 @@ available here; native compilation/playback and profitability are unverified.
   incomplete appended CSV rows.
 
 ## Outstanding acceptance and research
+
+R1 is an unvalidated adaptive paper experiment. Compile and exercise its native
+owner lease, persisted risk/learning history, repeat setup claims, bracket cleanup,
+news pauses and callback ordering on Windows. Cloud tests do not execute those
+native methods. Compare adaptive and fixed-filter versions on untouched future
+data; the P0/C1 research family intentionally rejects R1.
 
 Compile `MNQPlanPaper` in NinjaTrader 8; confirm native order and connection
 callbacks with market playback, including stop rejection/cancellation, disconnect

@@ -10,7 +10,7 @@ import sys
 from bot.backtest import ReplayFailure, provenance, replay
 from bot.accounts import apply_account, load_accounts, update_account
 from bot.data import Calendar, checksum
-from bot.demo import generate
+from bot.demo import generate, generate_rolling
 from bot.models import Config
 from bot.report import engine_report, write_run
 from bot.research import prepare, run_phase
@@ -32,7 +32,7 @@ def parser():
     run.add_argument("--ticks", required=True)
     run.add_argument("--calendar", required=True)
     run.add_argument("--out", required=True)
-    run.add_argument("--strategy", choices=["P0", "C1"])
+    run.add_argument("--strategy", choices=["P0", "C1", "R1"])
     demo = commands.add_parser(
         "demo", help="Generate synthetic fixtures and run both strategies"
     )
@@ -138,6 +138,7 @@ def main(argv=None):
                     "late_news",
                     "news_flags",
                     "trade_enabled",
+                    "news_windows",
                 ]
             )
             for _, session in sorted(calendar.sessions.items()):
@@ -151,6 +152,10 @@ def main(argv=None):
                         str(session.late_news).lower(),
                         "|".join(session.news_flags),
                         str(session.trade_enabled).lower(),
+                        "|".join(
+                            f"{start.strftime('%H:%M:%S')}-{end.strftime('%H:%M:%S')}"
+                            for start, end in session.news_windows
+                        ),
                     ]
                 )
         print(f"Frozen NinjaTrader calendar written to {output}")
@@ -169,10 +174,15 @@ def main(argv=None):
         root = Path(args.out)
         ticks, calendar = generate(root, args.sessions)
         reports = {}
-        for strategy in ("P0", "C1"):
+        for strategy in ("P0", "C1", "R1"):
             cfg = replace(config, strategy=strategy)
-            engine = replay(ticks, calendar, cfg)
-            write_run(engine, root / strategy, provenance(ticks, calendar, cfg))
+            arm_ticks, arm_calendar = (
+                generate_rolling(root / "R1-fixture", args.sessions)
+                if strategy == "R1"
+                else (ticks, calendar)
+            )
+            engine = replay(arm_ticks, arm_calendar, cfg)
+            write_run(engine, root / strategy, provenance(arm_ticks, arm_calendar, cfg))
             reports[strategy] = engine_report(engine, True)
         print(json.dumps(reports, indent=2, allow_nan=False))
     elif args.command == "replay":

@@ -19,7 +19,11 @@ setup calendar is not a front-month research contract map.
 `trade_enabled=false` retains complete daily ranges for ATR20 but blocks entries.
 The updated native strategy accepts this eighth CSV column and also accepts the
 original seven-column format, whose rows default to enabled. Update the strategy
-source and compile before using the new CSV. A missing future date blocks entries;
+source and compile before using the new CSV. R1 also requires the ninth
+`news_windows` column, exported from each release's actual timestamp for a pause
+five minutes before through ten minutes after. P0/C1 still accept the original
+seven/eight-column formats; R1 rejects them because release times are missing.
+A missing future date blocks entries;
 the Sim101 preset must be updated before October 12, 2026.
 
 ## Sources checked

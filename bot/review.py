@@ -19,7 +19,8 @@ def diagnose(trade, audit, events, config):
     events = [
         e
         for e in events
-        if e["session"] == trade.session and e["timestamp"] <= trade.exit_time
+        if e["session"] == trade.session
+        and trade.entry_time <= e["timestamp"] <= trade.exit_time
     ]
     reasons = {e["reason"] for e in events}
     checks = []
@@ -69,13 +70,17 @@ def diagnose(trade, audit, events, config):
             "signal": audit.get("signal_direction"),
             "m": audit.get("m"),
             "calendar": audit.get("calendar_reason"),
+            "rolling_efficiency": audit.get("rolling_efficiency"),
+            "learning_at_entry": audit.get("learning_at_entry"),
         },
     )
     add(
         "System",
-        "Was the opening signal based on six completed bars and frozen at 10:00 ET?",
+        "Was the signal based on the required completed bars?",
         "Six completed opening bars retained."
         if config.strategy == "P0"
+        else "R1 uses six closed rolling bars and a fresh pullback breakout."
+        if config.strategy == "R1"
         else "C1 uses three completed formation bars.",
         "pass"
         if config.strategy == "P0" and len(audit.get("opening_bars", [])) == 6
@@ -237,20 +242,26 @@ def diagnose(trade, audit, events, config):
     )
     add(
         "Frequency",
-        "Was there a forbidden re-entry after the first trade?",
-        "Entry fill count in the session.",
+        "Was this one fill for a fresh setup rather than a duplicate entry?",
+        "Entry fill count for this trade; R1 permits multiple distinct setups.",
         "pass" if len(fills) == 1 else "flag",
         {"entry_fills": len(fills)},
     )
     add(
         "Risk",
         "Did the realized loss exceed the configured session loss budget?",
-        str(-trade.net_ticks * TICK_VALUE > config.session_loss_budget_usd),
+        str(
+            -audit.get("day_realized_after", trade.net_ticks * TICK_VALUE)
+            > config.session_loss_budget_usd
+        ),
         "flag"
-        if -trade.net_ticks * TICK_VALUE > config.session_loss_budget_usd
+        if -audit.get("day_realized_after", trade.net_ticks * TICK_VALUE)
+        > config.session_loss_budget_usd
         else "pass",
         {
-            "loss_usd": -trade.net_ticks * TICK_VALUE,
+            "day_net_usd": audit.get(
+                "day_realized_after", trade.net_ticks * TICK_VALUE
+            ),
             "budget_usd": config.session_loss_budget_usd,
         },
     )
@@ -318,6 +329,10 @@ def diagnose(trade, audit, events, config):
         "unknown_answers": sum(c["status"] == "unknown" for c in checks),
         "causal_claim": "Diagnostics describe observations; they do not prove why a market moved.",
         "active_strategy_changed": False,
+        "learning_at_entry": audit.get("learning_at_entry"),
+        "adaptation_policy": "R1 uses a bounded filter on completed results; broad strategy changes remain separate experiments"
+        if config.strategy == "R1"
+        else "Frozen baseline",
     }
 
 
@@ -345,7 +360,7 @@ def learning_queue(reviews, total_trades):
             },
             {
                 "name": "Break-even overlay comparison",
-                "implementation": "replay identical ticks with baseline config.json and funded config.funded-paper.json",
+                "implementation": "replay identical ticks with baseline config.json and funded config.funded-paper.json --strategy P0",
                 "selection": "Development only; freeze winning account policy before new validation/holdout.",
             },
             {

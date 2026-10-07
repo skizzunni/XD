@@ -33,14 +33,17 @@ class Config:
     seed: int = 1729
     daily_profit_target_usd: float = 0.0
     break_even_trigger_r: float = 0.0
+    rolling_momentum_threshold: float = 0.05
+    rolling_min_efficiency: float = 0.40
+    adaptive_quality: bool = True
 
     def __post_init__(self):
         if self.mode != "paper":
             raise ValueError(
                 "Only mode='paper' is implemented; live orders are unavailable"
             )
-        if self.strategy not in {"P0", "C1"}:
-            raise ValueError("strategy must be P0 or C1")
+        if self.strategy not in {"P0", "C1", "R1"}:
+            raise ValueError("strategy must be P0, C1 or R1")
         for f in fields(self):
             value = getattr(self, f.name)
             if f.type in {"int", "float", int, float}:
@@ -56,6 +59,15 @@ class Config:
                     raise ValueError(f"{f.name} must be nonnegative")
         if not isinstance(self.costs_calibrated, bool):
             raise ValueError("costs_calibrated must be a boolean")
+        if not isinstance(self.adaptive_quality, bool):
+            raise ValueError("adaptive_quality must be a boolean")
+        if (
+            not 0 < self.rolling_min_efficiency <= 0.85
+            or self.rolling_momentum_threshold <= 0
+        ):
+            raise ValueError(
+                "R1 requires efficiency in (0, .85] and a positive momentum threshold"
+            )
         if self.atr_sessions != 20 or self.stop_atr != 0.20:
             raise ValueError(
                 "P0/C1 baseline fixes ATR20 and the 0.20 ATR emergency stop"

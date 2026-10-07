@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import csv
 from dataclasses import dataclass
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
 import hashlib
 import json
 from pathlib import Path
@@ -46,6 +46,21 @@ class Session:
             time(15, 25) <= t.timetz().replace(tzinfo=None) <= time(16)
             for t in self.releases
         )
+
+    @property
+    def news_windows(self):
+        windows = []
+        for release in self.releases:
+            start, end = (
+                max(self.open, release - timedelta(minutes=5)),
+                min(self.close, release + timedelta(minutes=10)),
+            )
+            if start < end:
+                windows.append((start, end))
+        return tuple(sorted(windows))
+
+    def news_paused(self, timestamp):
+        return any(start <= timestamp < end for start, end in self.news_windows)
 
     @property
     def eligibility(self):
