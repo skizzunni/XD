@@ -182,6 +182,11 @@ namespace NinjaTrader.NinjaScript.Strategies
             }
             else if (State == State.Configure)
             {
+                if(String.IsNullOrWhiteSpace(PaperRunId) || PaperRunId.Any(c=>
+                    !(c>='a'&&c<='z' || c>='A'&&c<='Z' || c>='0'&&c<='9' || c=='-')))
+                    throw new InvalidOperationException("Paper run ID must contain only ASCII letters, numbers and hyphens, exactly matching the dashboard.");
+                Print("MNQPlanPaper startup: Paper run ID="+PaperRunId+"; logs="
+                    +Path.Combine(NinjaTrader.Core.Globals.UserDataDir,"MNQPaper",PaperRunId));
                 if (BarsPeriod.BarsPeriodType != BarsPeriodType.Minute || BarsPeriod.Value != 5)
                     throw new InvalidOperationException("Primary series must be 5-minute MNQ.");
                 AddDataSeries(BarsPeriodType.Tick, 1);
@@ -231,6 +236,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 // Historical→Realtime never carries historical strategy positions into paper orders.
                 if (AllowHistoricalOrders)
                     throw new InvalidOperationException("Turn off AllowHistoricalOrders before forward simulation.");
+                Log(NowEastern(),"REALTIME_STARTED","paper_run_id="+PaperRunId+";log_folder="+Path.GetDirectoryName(ledgerPath));
                 AcquireOwnership();
                 if(!ownershipDenied)
                 {
@@ -304,6 +310,21 @@ namespace NinjaTrader.NinjaScript.Strategies
             return new DateTimeOffset(DateTime.SpecifyKind(et, DateTimeKind.Unspecified), easternZone.GetUtcOffset(et)).ToString("o", CultureInfo.InvariantCulture);
         }
         private DateTime NowEastern() { return TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow,easternZone); }
+        private void LiveStatus(DateTime now,double price,double bid,double ask)
+        {
+            if(State!=State.Realtime || lastStatusTime!=DateTime.MinValue && (now-lastStatusTime).TotalSeconds<5) return;
+            lastStatusTime=now;
+            if(tickWriter!=null) tickWriter.Flush();
+            double mark=direction>0?(bid>0?bid:price):(ask>0?ask:price);
+            double unrealized=openQuantity>0?direction*(mark-entryFill)*2-RoundTurnFees-SlippagePerSide*0.50:0;
+            string phase=session==null?"NO_CALENDAR_SESSION"
+                :now.TimeOfDay<session.Open || now.TimeOfDay>=session.Close?"OUTSIDE_RTH"
+                :openQuantity>0?"POSITION_OPEN":EntryInFlight()?"ENTRY_PENDING"
+                :blocked?"BLOCKED":NewsPaused(now)?"NEWS_PAUSE"
+                :Arm==MNQPaperArm.R1 && (now.TimeOfDay<new TimeSpan(10,0,0) || now.TimeOfDay>new TimeSpan(15,45,0))?"WAITING_R1_WINDOW":"SCANNING";
+            Log(now,"LIVE_STATUS","price="+F(price)+";open_qty="+openQuantity+";unrealized_usd="+F(unrealized)
+                +";day_net_usd="+F(dayRealized)+";blocked="+blocked+";entry_pending="+EntryInFlight()+";news_pause="+NewsPaused(now)+";phase="+phase);
+        }
         private static string F(double value) { return value.ToString("R", CultureInfo.InvariantCulture); }
         private static string Safe(string value)
         {
@@ -423,6 +444,9 @@ namespace NinjaTrader.NinjaScript.Strategies
             if (session == null || now.TimeOfDay < session.Open || now.TimeOfDay >= session.Close)
             {
                 if (openQuantity > 0 && session != null && now.TimeOfDay >= session.Close) Fault(now,"DATA_GAP");
+                double outsidePrice=Closes[1][0],outsideBid=State==State.Realtime?GetCurrentBid():0,outsideAsk=State==State.Realtime?GetCurrentAsk():0;
+                if(outsidePrice>0 && Volumes[1][0]>0 && ((outsideBid>0)==(outsideAsk>0)) && (outsideBid<=0 || outsideBid<=outsideAsk))
+                    LiveStatus(now,outsidePrice,outsideBid,outsideAsk);
                 return;
             }
             double price = Closes[1][0];
@@ -437,14 +461,7 @@ namespace NinjaTrader.NinjaScript.Strategies
                 || (lastTickTime != DateTime.MinValue && (now-lastTickTime).TotalSeconds > MaxTickGapSeconds)) Fault(now,"DATA_GAP");
             double before = previousPrice;
             previousPrice = price; lastTickTime = now;
-            if(State==State.Realtime && (lastStatusTime==DateTime.MinValue || (now-lastStatusTime).TotalSeconds>=5))
-            {
-                lastStatusTime=now; tickWriter.Flush();
-                double mark=direction>0?(bid>0?bid:price):(ask>0?ask:price);
-                double unrealized=openQuantity>0?direction*(mark-entryFill)*2-RoundTurnFees-SlippagePerSide*0.50:0;
-                Log(now,"LIVE_STATUS","price="+F(price)+";open_qty="+openQuantity+";unrealized_usd="+F(unrealized)
-                    +";day_net_usd="+F(dayRealized)+";blocked="+blocked+";entry_pending="+EntryInFlight()+";news_pause="+NewsPaused(now));
-            }
+            LiveStatus(now,price,bid,ask);
             if(entryOrder!=null && openQuantity==0 && now>=entryDeadline
                 && (entryOrder.OrderState==OrderState.Working || entryOrder.OrderState==OrderState.Accepted))
             { CancelOrder(entryOrder); Log(now,"MISSED","CAPPED_ENTRY_EXPIRED"); }

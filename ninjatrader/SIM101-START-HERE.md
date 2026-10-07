@@ -8,6 +8,19 @@ The pip upgrade notice does not require action.
 
 ## Install and open the dashboard
 
+If the strategy is already running and the old watcher reports **WinError 5 /
+Access is denied** while replacing `dashboard.html`, press **Ctrl+C** in that
+watcher. From the fully extracted updated package, double-click
+**START-DASHBOARD.cmd** and enter the exact run ID currently shown under
+**Research → Paper run ID** in NinjaTrader. For the current test it is
+`r1-sim101-001`. This starts the browser dashboard without installing strategy
+source, changing the calendar or restarting NinjaTrader. Close the old local-file
+dashboard tab and use the browser page opened by the new launcher.
+
+The browser server reads the existing CSV logs and generates each page in memory.
+It does not replace `dashboard.html` in OneDrive. Keep the launcher window open;
+Ctrl+C stops the dashboard server and leaves the strategy running.
+
 1. Download the updated GitHub ZIP. Right-click it → **Extract All**. Open the
    extracted `XD-...` folder containing `requirements.txt` and `START-SIM101.cmd`.
    Work from the extracted folder, not the ZIP preview.
@@ -16,10 +29,12 @@ The pip upgrade notice does not require action.
    position before testing this strategy on that account.
 3. Double-click **START-SIM101.cmd**. It installs the pinned dashboard dependency,
    copies the updated strategy and current calendar into your actual NinjaTrader
-   Documents folder, and starts the dashboard watcher. Different existing files
+   Documents folder, and starts the browser dashboard. It asks for your exact
+   **Research → Paper run ID**; enter the same value in NinjaTrader. Different existing files
    are backed up under `NinjaTrader 8\MNQPaper\install-backups\...`.
-   Leave this window open. It will say **Waiting for strategy logs** until the
-   strategy is enabled with the matching run ID. The watcher does not place orders.
+   Leave this window open. The browser opens even before logs exist, showing the
+   selected run, log folder, other found runs and startup checks. Existing logs
+   may belong to stopped runs. The dashboard does not place orders.
 4. In NinjaTrader choose **New → NinjaScript Editor**, then press **F5**. If
    compilation fails, keep the strategy disabled and send the full error table.
    Native compilation has not been run in the cloud.
@@ -91,13 +106,25 @@ See [R1-SCANNER.md](R1-SCANNER.md) for exact filters, learning and restart rules
 
 ## Read the dashboard and assess results
 
-The launcher opens the dashboard when native event logs exist. The watcher reads
-logs every five seconds; the browser page refreshes every five seconds. A
+The launcher opens a browser page served on your own PC, normally at
+`http://127.0.0.1:8765/`. If that port is busy it chooses a free port and prints
+the actual address. The page refreshes every five seconds; each request reads
+the current log snapshot. No HTML replacement is needed. A
 page without completed trades can still show events explaining why the strategy
 is waiting or blocked. Keep **Paper run ID** identical in the strategy and
-watcher. Existing nonempty tick logs require a fresh run ID on a restart, e.g.
+dashboard. Opening or restarting the dashboard can keep the same run ID.
+Restarting the NinjaTrader strategy when existing tick logs are nonempty requires
+a fresh run ID, e.g.
 `r1-sim101-002`; run `python windows_setup.py dashboard --run-id r1-sim101-002`
-to watch it. Session entry locks remain in place across run IDs.
+to watch it. Session entry locks remain in place across run IDs. The dashboard
+shows startup diagnostics before any trade. With the updated native source,
+premarket ticks show `OUTSIDE_RTH`; R1 begins forming entries at 10:00 ET.
+
+If there are no logs despite a matching run ID, open **New → NinjaScript Output**
+and Control Center **Log**. The updated strategy prints the actual log folder at
+startup. Initialization or historical-data loading may not have finished. Copy
+any error text from these windows; “Waiting for strategy logs” alone does not
+establish a compile error or a disconnected feed.
 
 Orders/fills are visible immediately in Control Center **Orders/Executions**.
 Completed trades appear in the dashboard with estimated fee-adjusted P&L,

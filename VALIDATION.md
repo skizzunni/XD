@@ -6,7 +6,7 @@ available here; native compilation/playback and profitability are unverified.
 
 ## Checks completed
 
-- 70 automated tests: signal thresholds/freeze, ATR lag, Eastern/DST, early closes,
+- 82 automated tests: signal thresholds/freeze, ATR lag, Eastern/DST, early closes,
   rollover, news, bad/duplicate data, slippage caps, quote cost invariants,
   stop/time/target tick ordering, recovery reconstruction, unresolved-position
   preservation, account stages, net break-even/gap loss, research freeze/holdout
@@ -62,6 +62,16 @@ available here; native compilation/playback and profitability are unverified.
   Known Folder calls, the CMD launcher and NinjaTrader remain unrun on Windows.
 - Added verified Windows timezone support; escaped dashboard payloads and handled
   incomplete appended CSV rows.
+- Replaced the native dashboard's repeated HTML writes with a read-only local
+  browser server. Real HTTP tests cover waiting/startup diagnostics, live appended
+  events, a simulated locked HTML file, malformed/nonfinite snapshots, read
+  failures, occupied ports and refusing arbitrary file requests. The
+  dashboard-only launcher preserves installed source and calendar. Package
+  preflight catches missing strategy files before installation; run-ID selection
+  uses the same explicit value for installation instructions and the dashboard.
+- Added native startup path messages and premarket status telemetry without
+  changing the entry window, order routing or risk limits. Native execution of
+  these messages remains unverified until compiled on Windows.
 
 ## Outstanding acceptance and research
 

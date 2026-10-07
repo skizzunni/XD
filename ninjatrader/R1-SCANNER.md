@@ -74,8 +74,10 @@ released when that instance terminates. Per-setup `.entry` claims prevent duplic
 orders after restarts while allowing later setups. Do not delete active claims.
 
 Reconcile any open position before updating/restarting. Use a fresh **Paper run ID**
-when existing tick logs are nonempty. The launcher watches `r1-sim101-001`; for a
-later run, launch `python windows_setup.py dashboard --run-id r1-sim101-002`.
+when existing tick logs are nonempty. The launcher asks for the exact run ID
+shown in NinjaTrader; the initial value is `r1-sim101-001`. For a later run,
+launch `python windows_setup.py dashboard --run-id r1-sim101-002`. Restarting
+only the browser dashboard keeps the current run ID.
 Only Sim101 and Playback101 are permitted for current-market orders. Native
 historical Strategy Analyzer runs do not persist/train the live result history;
 use Python replay or Playback101 to compare R1 adaptation chronologically.
@@ -84,8 +86,13 @@ use Python replay or Playback101 to compare R1 adaptation chronologically.
 
 NinjaTrader publishes current price, open quantity, estimated open P&L, session
 realized P&L and blocked/news-pause status about every five seconds of tick time.
-The watcher rebuilds the HTML every five seconds and the page refreshes every
-five seconds, showing new state within about 5–15 seconds. Tick age
+The local browser server reads the current CSV snapshot on each request. The
+page refreshes every five seconds, showing new state within about 5–10 seconds
+under normal load. It generates HTML in memory and does not replace a file in
+OneDrive. `START-DASHBOARD.cmd` starts it without reinstalling or restarting the
+strategy. The page also opens while waiting for logs, showing run/folder
+diagnostics; account and feed values stay unknown until available. The updated
+strategy publishes premarket status without enabling premarket trades. Tick age
 continues increasing if the feed stops, rather than implying fresh data. Loss
 reviews stay expanded across refreshes, and the quality-learning panel shows
 observations, recent results and the active threshold. Native fills and commissions

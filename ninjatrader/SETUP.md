@@ -8,7 +8,9 @@ The strategy is not yet deployed to your PC.
 For **Sim101 on current market data**, follow [SIM101-START-HERE.md](SIM101-START-HERE.md)
 and double-click `START-SIM101.cmd` from the extracted project. The launcher
 locates its own files and installs the dated October 7–9 calendar. It preserves
-older files in backups and opens the dashboard when logs exist. Compilation and
+older files in backups and opens the browser dashboard with startup diagnostics.
+For an already running strategy, use `START-DASHBOARD.cmd` to read its logs
+without reinstalling source or changing the calendar. Compilation and
 enabling still happen in NinjaTrader.
 
 1. Download and unzip the delivered `mnq-paper-bot.zip` on your Windows PC.
@@ -81,19 +83,20 @@ enabling still happen in NinjaTrader.
    .\ninjatrader\Watch-Dashboard.ps1 -RunId p0-playback-001
    ```
 
-   It runs Python, reads the CSV logs every 5 seconds and opens `dashboard.html` in
-   your browser. The page refreshes every 5 seconds. If `python` is not on PATH,
+   It runs Python and opens a local browser server. The page refreshes every
+   5 seconds, reading a fresh CSV snapshot without rewriting HTML in OneDrive.
+   If `python` is not on PATH,
    pass `-PythonExe 'C:\path\to\python.exe'`. If your Documents folder is relocated
    (e.g. OneDrive), pass `-NinjaTraderHome 'your actual NinjaTrader 8 folder'`.
    If PowerShell blocks the helper, use the Python command directly instead of
    changing the machine's execution policy:
 
    ```powershell
-   python main.py dashboard --nt-events 'C:\Users\you\Documents\NinjaTrader 8\MNQPaper\p0-playback-001\Sim101_MNQ_12_26_P0_events.csv' --out dashboard.html
+   python windows_setup.py dashboard --run-id p0-playback-001
    ```
 
-   Use the actual log filename from your run directory; the exact name varies.
-   Open `dashboard.html`. Rerun the command to refresh it, or use the watcher.
+   Use the exact Paper run ID from NinjaTrader. The browser opens automatically;
+   otherwise copy the address printed by the server. Keep its window open.
 8. For each evaluation account's strategy instance set **Account stage=Evaluation**;
    after passing, set **Funded**. The classifier controls daily targets. This build
    restricts actual order routing to Sim101/Playback101, so changing the label does

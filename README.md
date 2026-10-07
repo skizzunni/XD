@@ -16,7 +16,10 @@ are implementation checks, never evidence of profitable trading.
 On Windows, start with [the Sim101 current-market guide](ninjatrader/SIM101-START-HERE.md).
 Extract the ZIP and double-click **START-SIM101.cmd**. It installs the dependency,
 backs up older strategy/calendar files, installs the current dated calendar, and
-opens a local dashboard when NinjaTrader produces logs. You compile with F5,
+asks for the exact Paper run ID, and opens a local browser dashboard even while
+waiting for logs. If the strategy is already running, use **START-DASHBOARD.cmd**
+to view its logs without reinstalling or restarting it. Browser pages are
+generated in memory, avoiding OneDrive HTML replacement errors. You compile with F5,
 connect your market-data feed and enable the strategy on Sim101.
 
 ## Run locally
@@ -30,7 +33,9 @@ python main.py dashboard --run runs/my-demo/R1 --out runs/dashboard.html
 
 Open `runs/dashboard.html` in a browser. It shows trades, equity, drawdown, account
 stage, events and 30 diagnostic questions for each loss. It refreshes the local
-file every 5 seconds; no web service or account credentials are needed.
+file every 5 seconds; this offline export needs no web service or account
+credentials. Regenerate the export when its underlying replay files change.
+The live native dashboard instead runs a small Python browser server on your PC.
 
 ## Account stages
 
