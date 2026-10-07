@@ -171,6 +171,10 @@ def engine_report(engine, synthetic=False):
         "trade_count_cap": None if engine.config.strategy in {"R1", "R2"} else 1,
         "exit_profile": engine.config.exit_profile,
         "paper_contracts": engine.config.paper_contracts,
+        "adaptive_sizing": engine.config.adaptive_sizing,
+        "max_paper_contracts": engine.config.max_paper_contracts,
+        "executed_quantities": sorted({t.quantity for t in engine.trades}),
+        "sizing_samples": len(engine.sizer.samples),
         "learning_samples": len(engine.learner.samples) + (len(engine.overnight_learner.samples) if engine.config.strategy == "R2" else 0),
         "learning_profiles": {"RTH": len(engine.learner.samples), **({"OVERNIGHT": len(engine.overnight_learner.samples)} if engine.config.strategy == "R2" else {})},
         "decision": "SYNTHETIC_SMOKE_TEST_ONLY"

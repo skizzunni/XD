@@ -6,11 +6,27 @@ available here; native compilation/playback and profitability are unverified.
 
 ## Checks completed
 
-- 132 automated tests: signal thresholds/freeze, ATR lag, Eastern/DST, early closes,
+- 144 automated tests: signal thresholds/freeze, ATR lag, Eastern/DST, early closes,
   rollover, news, bad/duplicate data, slippage caps, quote cost invariants,
   stop/time/target tick ordering, recovery reconstruction, unresolved-position
   preservation, account stages, net break-even/gap loss, research freeze/holdout
   lock and diagnostics/dashboard import.
+- Adaptive sizing tests cover growth from 2 through 10, loss streaks, weak
+  windows, faults, a single outlier winner, quantity-independent net R,
+  strictly prior/profile-specific observations, exact cash boundaries and
+  actual learned-quantity entries, fees, loss diagnostics and replay dashboards.
+  Fixed modes retain their quantity; fixed comparison CLIs disable sizing.
+- Two matching 48-session adaptive TrendRunner synthetic runs processed
+  66,240 ticks and 1,260 positions each, actually using quantities 2–10.
+  Every position reconciled to one sizing sample; no overlapping positions or
+  reused entry IDs occurred, and each entry fit the remaining explicit budget.
+  The stress configuration deliberately used a $1,000 session budget; it does
+  not establish that ten contracts fit the default $100 or real market setups.
+  Event SHA256:
+  `a6860d8ae53e60891c014aad7f636d8f494f0703dbcf70f0a1536a4b50b59915`.
+  Trade SHA256:
+  `79c9e06069320dd54df1756e9a27e345f32915ca755aefaba4b864590b0cb30a`.
+  Synthetic outcomes are behavior checks, not profitability evidence.
 - 2,000 seeded random bid/ask, fee and slippage combinations checked P&L identities.
 - A 400-session synthetic stress file contained 156,000 ticks. P0 closed 380 trades
   and produced 76 loss reviews with 30 questions each; no data faults. C1 had no
@@ -53,7 +69,7 @@ available here; native compilation/playback and profitability are unverified.
 - Python compilation and unused/unbound-name analysis passed.
 - C# grammar parsing passed; this does not verify NinjaTrader API bindings.
 - The actual C# contract helpers were extracted, compiled with a checksum-verified
-  .NET 8 SDK and exercised against 6,425 cases, including all quarterly expiries,
+  .NET 8 SDK and exercised against 8,226 cases, including all quarterly expiries,
   wrong years/products and seeded invalid identifiers, plus actual extracted
   session, learning and calendar-loader methods. Boundary assertions check
   futures dates, break/close deadlines, profile learning and connection-startup
@@ -63,6 +79,10 @@ available here; native compilation/playback and profitability are unverified.
   Compiled assertions cover weighted partial-fill cash, pending executions and
   avoiding doubled risk from learning rows. A thousand seeded cases verify
   partial-fill P&L for sizes 1/2/5/10; another thousand verify trailing-stop parity.
+  Three hundred random outcome streams check Python/C# adaptive policy parity,
+  and 1,500 cash boundaries check fitted quantities. Actual extracted risk CSV
+  loading reconstructs growth and cash without double counting normalized SIZE
+  rows; missing SIZE/LEARNING pairs block restart. Legacy cash remains readable.
 - Dashboard JavaScript syntax and functional checks passed for summary cards,
   380 trade rows, a 76-row loss filter, equity chart and 30-question review display.
 - The current R1 dashboard also passed JavaScript syntax and DOM-harness checks
@@ -76,6 +96,10 @@ available here; native compilation/playback and profitability are unverified.
   Runner, open quantity, working stop and dashboard refresh timestamps also
   passed DOM checks. HTTP tests show a fresh snapshot while a quote remains
   ten minutes old. Partial fill rows produce one closed dashboard trade.
+- Adaptive browser DOM and live HTTP snapshot checks verify learned size,
+  automatic reductions, the last risk-fitted quantity, actual closed-position
+  quantity and sizing in the diagnostic download. Sizing updates never create
+  fake trades. Existing diagnostic filters and stale-feed displays passed again.
 - The pinned, checksum-verified timezone package was tested with OS zone lookup
   disabled, matching Windows' need for packaged IANA time zones.
 

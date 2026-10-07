@@ -29,9 +29,12 @@ class PaperBroker:
         fill = market + side * self.config.slippage_ticks_per_side * TICK
         return fill, reference
 
-    def enter(self, tick, direction, stop, target=None):
+    def enter(self, tick, direction, stop, target=None, quantity=None):
         if self.position:
             raise RuntimeError("One open position only")
+        quantity = self.config.paper_contracts if quantity is None else quantity
+        if type(quantity) is not int or not 1 <= quantity <= 10:
+            raise ValueError("Paper fill quantity must be an integer from 1 to 10")
         fill, reference = self.quote(tick, direction)
         self.position = Position(
             direction,
@@ -42,7 +45,7 @@ class PaperBroker:
             tick.contract,
             target,
             abs(fill - stop),
-            quantity=self.config.paper_contracts,
+            quantity=quantity,
         )
         return self.position
 

@@ -9,10 +9,13 @@ experiment; **P0 session-open momentum** and **C1 fair value gap** preserve the
 original single-entry plan for comparison. Native routing accepts simulated
 accounts only.
 
-The new [trend-runner and size comparison](ninjatrader/R2-EXIT-EXPERIMENT.md)
-keeps fixed exits as a baseline. Select **R2 exit profile=TrendRunner** and
-**Paper contracts=2** for the requested larger simulation. Higher quantity does
-not raise the session loss budget automatically.
+The [adaptive sizing experiment](ninjatrader/R2-ADAPTIVE-SIZING.md) starts at
+**2 contracts** and can grow toward **10** from completed, risk-normalized
+results, with automatic reductions after loss streaks and weak performance.
+Set **R2 adaptive paper sizing=True**, **R2 maximum paper contracts=10** and
+**R2 exit profile=TrendRunner**. Every setup still fits the explicit remaining
+loss budget, so it may use fewer contracts. The
+[fixed exit/size comparison](ninjatrader/R2-EXIT-EXPERIMENT.md) remains available.
 
 The Python engine runs on Python 3.12+ with a pinned IANA `tzdata` package for
 Windows time zone support. The
@@ -72,6 +75,7 @@ python main.py --account my-evaluation replay --ticks data/ticks.csv --calendar 
 baseline with no break-even/target overlay. `config.evaluation.json` and
 `config.funded-paper.json` contain the requested account overlays.
 `config.full-session-paper.json` selects the R2 full-session experiment; the
+`config.adaptive-paper.json` selects the new adaptive two-to-ten runner profile;
 older Python CLI default remains R1 for reproducible comparisons. An explicit
 `--config` selects that profile unless `--account` is also supplied. Research
 defaults to the baseline and forbids silently importing account overlays.

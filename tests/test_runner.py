@@ -104,7 +104,7 @@ class RunnerTests(unittest.TestCase):
             for s in c.sessions.values():
                 for t in ticks_for(s):w.writerow([t.timestamp.isoformat(),t.price,t.volume,t.contract,t.tick_id,t.bid,t.ask])
         out=Path(self.tmp.name)/"comparison"
-        config=Path(__file__).resolve().parents[1]/"config.full-session-runner-paper.json"
+        config=Path(__file__).resolve().parents[1]/"config.adaptive-paper.json"
         with redirect_stdout(io.StringIO()):
             self.assertEqual(main(["--config",str(config),"compare-r2-exits","--ticks",str(ticks),"--calendar",str(self.path),"--out",str(out)]),0)
         comparison=json.loads((out/"comparison.json").read_text())
@@ -113,6 +113,7 @@ class RunnerTests(unittest.TestCase):
         self.assertEqual(manifests[0]["tick_checksum"],manifests[1]["tick_checksum"])
         for m in manifests:
             self.assertFalse(m["config"]["adaptive_quality"])
+            self.assertFalse(m["config"]["adaptive_sizing"])
             self.assertEqual(m["config"]["round_turn_fees_usd"],1.5)
         self.assertTrue(all(v["decision"]=="SYNTHETIC_SMOKE_TEST_ONLY" for v in comparison["profiles"].values()))
         self.assertEqual({t["exit_profile"] for t in run_payload(out/"TrendRunner")["trades"]},{"TrendRunner"})

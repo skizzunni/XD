@@ -31,6 +31,7 @@ def check_package(calendar_dir=SIM_PRESET):
             "bot/dashboard.py",
             "bot/contracts.py",
             "bot/fullsession.py",
+            "bot/sizing.py",
             "ninjatrader/MNQPlanPaper.cs",
         )
     ] + [Path(calendar_dir) / name for name in ("calendar.json", "MNQCalendar.csv")]
@@ -237,6 +238,7 @@ def diagnostic_report(payload):
         "startup": payload.get("startup"),
         "entry_checks": payload.get("entry_checks", []),
         "live_status": payload.get("live_status", []),
+        "sizing_status": payload.get("sizing_status", []),
         "total_event_count": len(payload["events"]),
         "diagnostic_events": [event for event in payload["events"] if event.get("reason") != "LIVE_STATUS"],
         "note": "Recorded ledger evidence only. Existing logs do not prove that the strategy is currently enabled or connected. The report changes no trading controls.",

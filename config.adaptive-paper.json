@@ -1,0 +1,13 @@
+{
+  "mode": "paper",
+  "strategy": "R2",
+  "exit_profile": "TrendRunner",
+  "paper_contracts": 2,
+  "adaptive_sizing": true,
+  "max_paper_contracts": 10,
+  "round_turn_fees_usd": 1.5,
+  "costs_calibrated": false,
+  "session_loss_budget_usd": 100.0,
+  "daily_profit_target_usd": 0.0,
+  "break_even_trigger_r": 1.0
+}

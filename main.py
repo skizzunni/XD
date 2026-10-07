@@ -208,7 +208,7 @@ def main(argv=None):
         results={}
         for quantity,profile in ((q,p) for q in quantities for p in ("Fixed","TrendRunner")):
             label=f"Q{quantity}-{profile}" if args.command=="compare-r2-sizing" else profile
-            cfg=replace(config,strategy="R2",exit_profile=profile,adaptive_quality=False,paper_contracts=quantity)
+            cfg=replace(config,strategy="R2",exit_profile=profile,adaptive_quality=False,adaptive_sizing=False,paper_contracts=quantity)
             try:
                 engine=replay(args.ticks,args.calendar,cfg)
             except ReplayFailure as exc:
@@ -217,7 +217,7 @@ def main(argv=None):
             write_run(engine,root/label,provenance(args.ticks,args.calendar,cfg))
             results[label]=engine_report(engine,engine.calendar.synthetic)
         comparison={"profiles":results,"tick_checksum":checksum(args.ticks),"calendar_checksum":checksum(args.calendar),
-                    "adaptive_quality":False,"automatic_promotion":False,
+                    "adaptive_quality":False,"adaptive_sizing":False,"automatic_promotion":False,
                     "quantities":quantities,"session_loss_budget_usd":config.session_loss_budget_usd,
                     "note":"Same quotes, per-contract costs, news and unchanged session loss budget. Larger quantities can reject otherwise valid signals when planned loss exceeds remaining budget. Replay does not model size-dependent market impact. Exit changes also change later entry availability. Synthetic outcomes are behavior tests; real historical outcomes require future validation."}
         (root/"comparison.json").write_text(json.dumps(comparison,indent=2,allow_nan=False)+"\n")

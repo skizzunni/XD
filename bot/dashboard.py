@@ -151,7 +151,7 @@ def entry_diagnostics(rows, ledger):
 
 def native_payload(paths):
     trades, events, reviews, pending = [], [], [], []
-    live, learning = {}, {}
+    live, learning, sizing = {}, {}, {}
     entry_checks = []
     for path in paths:
         path = Path(path)
@@ -184,6 +184,10 @@ def native_payload(paths):
                     "timestamp": e["timestamp"],
                     **d,
                 }
+            if e["reason"] in {"SIZING_UPDATE", "SIZING_DECISION"}:
+                profile = (e.get("account"), e.get("arm"), d.get("regime"), d.get("exit_profile"))
+                sizing[profile] = {**sizing.get(profile, {}), "account": e.get("account"),
+                                   "strategy": e.get("arm"), "timestamp": e["timestamp"], **d}
             if e["reason"] == "FILLED" and d.get("name") == "MNQ_ENTRY":
                 if entry and entry.get("id")==d.get("trade_id"):
                     quantity=int(d["quantity"])
@@ -209,6 +213,7 @@ def native_payload(paths):
                     "futures_day": d.get("futures_day"),
                     "regime": d.get("regime"),
                     "exit_profile": d.get("exit_profile", "Fixed"),
+                    "adaptive_sizing": d.get("adaptive_sizing", "False"),
                     "id": d.get("trade_id") or f"{e.get('account')}:{d.get('order_id')}",
                 }
             elif "net_usd" in d and e["reason"] != "LOSS_RECORDED":
@@ -276,6 +281,7 @@ def native_payload(paths):
         "pending_positions": pending,
         "live_status": list(live.values()),
         "learning_status": list(learning.values()),
+        "sizing_status": list(sizing.values()),
         "entry_checks": entry_checks,
         "note": "Native P&L deducts the configured fees. Verify against NinjaTrader account statements; fees may still be provisional.",
     }
@@ -321,6 +327,7 @@ def run_payload(directory):
         "pending_positions": pending,
         "live_status": [],
         "learning_status": [e for e in engine_learning_events(directory)],
+        "sizing_status": list(engine_sizing_events(directory)),
         "events": [
             json.loads(line)
             for line in (directory / "events.jsonl").read_text().splitlines()
@@ -343,6 +350,16 @@ def engine_learning_events(directory):
     return latest.values()
 
 
+def engine_sizing_events(directory):
+    latest = {}
+    for line in (Path(directory) / "events.jsonl").read_text().splitlines():
+        event = json.loads(line)
+        if event["reason"] in {"SIZING_UPDATE", "SIZING_DECISION"}:
+            profile = event["profile"]
+            latest[profile] = {**latest.get(profile, {}), **event}
+    return latest.values()
+
+
 HTML = r"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>MNQ Paper Dashboard</title>
@@ -357,6 +374,7 @@ HTML = r"""<!doctype html>
 <h2>Entry diagnostics</h2><div id="entry-checks"></div>
 <p id="diagnostic-download" hidden><a href="/diagnostics.json" download>Download diagnostic report</a> — recorded checks and events, with routine tick-status updates removed.</p>
 <h2>Quality filter learning</h2><div id="learning"></div>
+<h2>Adaptive paper sizing</h2><div id="sizing"></div>
 <h2>Closed-trade equity</h2><svg id="equity" viewBox="0 0 1100 230" role="img" aria-label="Cumulative paper profit and loss"></svg>
 <h2>Trades</h2><div class="scroll"><table><thead><tr><th>Session / account</th><th>Profile / strategy</th><th>Entry (ET)</th><th>Exit (ET)</th><th>Exit reason</th><th>MNQ</th><th>Net P&amp;L</th></tr></thead><tbody id="trades"></tbody></table></div>
 <h2>Open or unmatched positions</h2><div id="pending"></div>
@@ -393,7 +411,8 @@ function draw(){
  $('live').innerHTML=live.map(s=>'<p><strong>'+esc(s.account)+' / '+esc(s.strategy)+'</strong>'+(s.exit_profile?' · Exits '+esc(s.exit_profile):'')+(s.regime?' · '+esc(s.regime):'')+(s.futures_day?' · Futures day '+esc(s.futures_day):'')+' · Price '+esc(s.price)+' · Open contracts '+esc(s.open_qty)+' · Estimated open P&amp;L '+money(Number(s.unrealized_usd))+' · Session realized '+money(Number(s.day_net_usd))+(s.stop_price?' · Working stop '+esc(s.stop_price):'')+'<br>'+esc(phases[s.phase]||((s.blocked==='True'||s.blocked===true)?'Entries blocked':(s.news_pause==='True'||s.news_pause===true)?'Scheduled news pause':'Scanning for eligible setups'))+' · Latest tick '+esc(et(s.timestamp))+' <span class="tick-age" data-time="'+esc(s.timestamp)+'" data-limit="'+esc(s.max_tick_gap_seconds||90)+'"></span>'+(s.received_at_et?'<br>Delivery lag at logged update: '+esc(s.feed_age_seconds)+'s · Received '+esc(et(s.received_at_et)):'')+'</p>').join('')||'<p>Waiting for live ticks from the strategy. Read the event ledger for initialization and history status. Historical replay has no live connection.</p>';
  $('entry-checks').innerHTML=(data.entry_checks||[]).filter(c=>account==='all'||c.account===account).map(c=>'<div class="notice"><strong>'+esc(c.account)+' / '+esc(c.strategy)+' · Latest logged session '+esc(c.logged_session)+'</strong>'+(c.feed_timing?'<p>'+esc(c.feed_timing.message)+'</p>':'')+'<p>'+(c.latest_event==='TERMINATED'?'This ledger ends with TERMINATED. Check the currently enabled strategy instance.':c.blocked===true?'The latest logged tick reports entries blocked.':c.blocked===false?'The latest logged tick reports entries unblocked.':'No blocked/unblocked state is available for this logged session.')+'</p>'+(c.strategy==='P0'?'<p>Recorded arm is P0, which uses late-afternoon entries. The requested full-session scanner is R2; select R2 explicitly in NinjaTrader.</p>':'')+((c.recorded_checks||[]).length?'<p>Recorded checks for this session; earlier checks may no longer be active:</p>'+c.recorded_checks.map(f=>'<p><strong>'+esc(f.reason)+'</strong> · First '+esc(et(f.first_time))+' · Latest '+esc(et(f.last_time))+' · '+esc(f.occurrences)+' occurrence(s)<br>'+esc(f.hint)+'<br><code>'+esc(f.details)+'</code></p>').join(''):c.blocked===true?'<p>The ledger does not identify a blocking cause for this session. Inspect NinjaScript Output and Control Center Log.</p>':'<p>No blocking-check events were found for this logged session.</p>')+'</div>').join('')||'<p>No native diagnostic records available yet.</p>';
  $('learning').innerHTML=(data.learning_status||[]).filter(s=>account==='all'||!s.account||s.account===account).map(s=>'<p>'+esc(s.account||'Replay')+' · '+esc(s.regime||'RTH')+' · '+esc(s.exit_profile||'Fixed')+' · '+(Number(s.direction)>0?'Long':'Short')+' · '+esc(s.observations)+' completed observations · Recent net '+money(Number(s.recent_net_usd))+' · Minimum trend efficiency '+esc(Number(s.min_efficiency).toFixed(2))+' · '+((s.tightened===true||s.tightened==='True')?'Stricter filter active':'Base filter active')+'</p>').join('')||'<p>R1/R2 learn from completed trades. R2 keeps daytime and overnight outcomes separate; eight outcomes per direction and profile are needed before a filter can tighten.</p>';
- $('reviews').innerHTML=data.loss_reviews.filter(r=>account==='all'||r.trade.account===account||r.trade.account==null).map((r,i)=>'<details id="loss-'+i+'"><summary>'+esc(r.trade.session)+' · '+esc(r.trade.account||'paper replay')+' · '+money(r.trade.net_usd??r.trade.net_ticks*.5*(r.trade.quantity||1))+' · '+r.diagnostics.length+' questions</summary>'+r.diagnostics.map(q=>'<div class="question"><strong>'+q.number+'. '+esc(q.question)+'</strong> <span class="badge '+(q.status==='flag'?'negative':q.status==='unknown'?'unknown':'')+'">'+esc(q.status)+'</span><div class="answer">'+esc(q.answer)+'</div>'+(q.evidence?'<pre>'+esc(JSON.stringify(q.evidence,null,2))+'</pre>':'')+'</div>').join('')+'<p>R1/R2 record bounded quality-filter changes from completed trades. Broader fixes need separate paper tests and future evidence.</p></details>').join('')||'<p>No recorded losses for this account.</p>';
+ $('sizing').innerHTML=(data.sizing_status||[]).filter(s=>account==='all'||!s.account||s.account===account).map(s=>'<p>'+esc(s.account||'Replay')+' · '+esc(s.regime||s.profile||'')+' · '+esc(s.exit_profile||'')+' · Evidence size <strong>'+esc(s.suggested_contracts)+' MNQ</strong> · Start '+esc(s.starting_contracts)+' / maximum '+esc(s.maximum_contracts)+' · '+esc(s.observations)+' clean completed positions · Recent net '+esc(Number(s.recent_net_r).toFixed(2))+'R · Recent drawdown '+esc(Number(s.recent_drawdown_r).toFixed(2))+'R<br>'+esc(s.sizing_reason||s.reason)+(s.selected_contracts!=null?' · Last setup selected '+esc(s.selected_contracts)+' MNQ; remaining loss budget '+money(Number(s.remaining_budget_usd)):'')+'</p>').join('')||'<p>No adaptive sizing records yet. Enable R2 adaptive paper sizing to let completed results change quantity. Fixed sizing uses the selected Paper contracts setting.</p>';
+ $('reviews').innerHTML=data.loss_reviews.filter(r=>account==='all'||r.trade.account===account||r.trade.account==null).map((r,i)=>'<details id="loss-'+i+'"><summary>'+esc(r.trade.session)+' · '+esc(r.trade.account||'paper replay')+' · '+money(r.trade.net_usd??r.trade.net_ticks*.5*(r.trade.quantity||1))+' · '+r.diagnostics.length+' questions</summary>'+r.diagnostics.map(q=>'<div class="question"><strong>'+q.number+'. '+esc(q.question)+'</strong> <span class="badge '+(q.status==='flag'?'negative':q.status==='unknown'?'unknown':'')+'">'+esc(q.status)+'</span><div class="answer">'+esc(q.answer)+'</div>'+(q.evidence?'<pre>'+esc(JSON.stringify(q.evidence,null,2))+'</pre>':'')+'</div>').join('')+'<p>R1/R2 record bounded quality-filter and sizing changes from completed trades. Broader fixes need separate paper tests and future evidence.</p></details>').join('')||'<p>No recorded losses for this account.</p>';
  const eventMode=$('event-mode').value;
  try{localStorage.setItem('mnqEventMode',eventMode);}catch(e){}
  const ledger=data.events.filter(e=>account==='all'||!e.account||e.account===account).filter(e=>eventMode==='all'||(eventMode==='live'?e.reason==='LIVE_STATUS':e.reason!=='LIVE_STATUS'));

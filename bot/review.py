@@ -133,8 +133,12 @@ def diagnose(trade, audit, events, config):
     add(
         "Risk",
         "Was quantity within the selected paper-contract setting?",
-        str(audit.get("position_quantity", "Unknown")),
-        "pass" if audit.get("position_quantity") == config.paper_contracts else "unknown",
+        f"Starting={config.paper_contracts}; planned={audit.get('position_quantity', 'Unknown')}; filled={trade.quantity}; adaptive={config.adaptive_sizing}",
+        "unknown" if audit.get("position_quantity") is None else
+        "pass" if audit["position_quantity"] == trade.quantity and
+        (1 <= trade.quantity <= config.max_paper_contracts if config.adaptive_sizing
+         else trade.quantity == config.paper_contracts) else "flag",
+        {"sizing_at_entry": audit.get("sizing_at_entry")},
     )
     add(
         "Emotion",
@@ -289,7 +293,7 @@ def diagnose(trade, audit, events, config):
     add(
         "Execution",
         "Could latency, order rejection or partial fills explain the loss?",
-        "This engine simulates atomic one-contract fills; latency and broker state are unmeasured.",
+        f"This engine simulates an atomic {trade.quantity}-contract position; latency, size impact and broker state are unmeasured.",
         "unknown",
     )
     add(

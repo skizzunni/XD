@@ -43,6 +43,8 @@ class Config:
     full_session_max_spread_ticks: int = 2
     exit_profile: str = "Fixed"
     paper_contracts: int = 1
+    adaptive_sizing: bool = False
+    max_paper_contracts: int = 10
 
     def __post_init__(self):
         if self.mode != "paper":
@@ -55,6 +57,12 @@ class Config:
             raise ValueError("TrendRunner exits require the separate R2 paper experiment")
         if type(self.paper_contracts) is not int or not 1<=self.paper_contracts<=10 or self.paper_contracts!=1 and self.strategy!="R2":
             raise ValueError("Paper contracts must be 1-10; multiple contracts require R2")
+        if (not isinstance(self.adaptive_sizing, bool)
+                or self.adaptive_sizing and self.strategy != "R2"):
+            raise ValueError("Adaptive sizing requires R2 and a boolean setting")
+        if (type(self.max_paper_contracts) is not int or not 1 <= self.max_paper_contracts <= 10
+                or self.adaptive_sizing and self.paper_contracts > self.max_paper_contracts):
+            raise ValueError("Adaptive maximum must be 1-10 and at least the starting quantity")
         for f in fields(self):
             value = getattr(self, f.name)
             if f.type in {"int", "float", int, float}:

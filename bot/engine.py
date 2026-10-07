@@ -9,6 +9,7 @@ import math
 from .broker import PaperBroker
 from .contracts import contract_key, same_contract
 from .learning import QualityLearner
+from .sizing import AdaptiveSizer, budget_quantity
 from .models import Bar, TICK, TICK_VALUE, round_outward
 from .strategy import fvg_setup, momentum_direction, rolling_setup
 
@@ -34,6 +35,7 @@ class Engine:
             config.rolling_min_efficiency, config.adaptive_quality
         )
         self.last_exit_time = None
+        self.sizer = AdaptiveSizer(config.paper_contracts, config.max_paper_contracts)
         self.trade_sequence = 0
         self._reset_session()
 
@@ -64,6 +66,9 @@ class Engine:
 
     def protect_profit(self, tick, executable):
         pass
+
+    def sizing_profile(self, timestamp):
+        return self.config.exit_profile + ":" + self.rolling_rules(timestamp)["regime"]
 
     def _reset_session(self):
         self.bars, self.current_bar = [], None
@@ -555,10 +560,20 @@ class Engine:
             self.blocked = not self.rolling
             self.log(tick, "order", "REJECTED", detail="INITIAL_RISK_BELOW_COST_FLOOR")
             return
+        quantity = self.config.paper_contracts
+        reservation = (risk_ticks * TICK_VALUE + self.config.round_turn_fees_usd
+                       + self.config.slippage_ticks_per_side * TICK_VALUE)
+        remaining = self.config.session_loss_budget_usd + min(0, self.day_realized)
+        sizing = None
+        if self.config.adaptive_sizing:
+            sizing = self.sizer.state(self.sizing_profile(tick.timestamp), tick.timestamp)
+            quantity = budget_quantity(sizing["suggested_contracts"], reservation, remaining)
+            self.log(tick, "sizing", "SIZING_DECISION", **sizing,
+                     selected_contracts=quantity, per_contract_reservation=reservation,
+                     remaining_budget_usd=remaining,
+                     budget_limited=quantity < sizing["suggested_contracts"])
         if (
-            (risk_ticks * TICK_VALUE
-            + self.config.round_turn_fees_usd
-            + self.config.slippage_ticks_per_side * TICK_VALUE)*self.config.paper_contracts
+            quantity == 0 or reservation * quantity
             > self.config.session_loss_budget_usd + min(0, self.day_realized)
         ):
             self.blocked = not self.rolling
@@ -592,11 +607,11 @@ class Engine:
             "SUBMITTED",
             order_id=oid,
             direction=direction,
-            quantity=self.config.paper_contracts,
+            quantity=quantity,
             bid=tick.bid,
             ask=tick.ask,
         )
-        self.broker.enter(tick, direction, stop, target)
+        self.broker.enter(tick, direction, stop, target, quantity=quantity)
         self.best_executable = fill
         initial_net = (
             direction * (self.broker.quote(tick, -direction)[0] - fill) / TICK
@@ -619,7 +634,8 @@ class Engine:
             "calendar_reason": self._eligibility(self.session),
             "stop_implementation": "local paper engine; no broker server",
             "fill_implementation": "deterministic tick simulation",
-            "position_quantity": self.config.paper_contracts,
+            "position_quantity": quantity,
+            "sizing_at_entry": sizing,
             "day_realized_before": self.day_realized,
             "order_id": oid,
             "learning_at_entry": self.learning_at_entry,
@@ -641,7 +657,7 @@ class Engine:
             order_id=oid,
             execution_id=f"{oid}:fill",
             price=fill,
-            quantity=self.config.paper_contracts,
+            quantity=quantity,
             stop=stop,
             target=target,
         )
@@ -650,6 +666,7 @@ class Engine:
         )
 
     def _exit(self, tick, reason):
+        initial_risk_usd = self.broker.position.initial_risk * 2 * self.broker.position.quantity
         self._mark_audit(tick)
         if self.audit:
             self.audit["final_stop"] = self.broker.position.stop
@@ -671,6 +688,15 @@ class Engine:
         if self.audit:
             self.audit["day_realized_after"] = self.day_realized
         self.last_exit_time = tick.timestamp
+        if self.config.adaptive_sizing:
+            profile = self.sizing_profile(datetime.fromisoformat(trade.entry_time))
+            self.sizer.record(self.active_order_id, tick.timestamp, profile,
+                              trade.net_ticks * TICK_VALUE * trade.quantity,
+                              initial_risk_usd,
+                              eligible=not self.quality_fault and reason != "FAULT_EXIT")
+            self.log(tick, "sizing", "SIZING_UPDATE",
+                     **self.sizer.state(profile, tick.timestamp + timedelta(microseconds=1)),
+                     completed_quantity=trade.quantity, initial_risk_usd=initial_risk_usd)
         self.trade_audits.append(self.audit or {})
         self.log(tick, "exit", reason, **asdict(trade))
         if trade.net_ticks < 0:

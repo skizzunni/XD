@@ -50,7 +50,8 @@ The native default remains one; select **Paper contracts=2** for the larger
 paper test. The table describes **Fixed** exits. The separate
 [TrendRunner option and sizing sweep](R2-EXIT-EXPERIMENT.md) retain these entry
 guards. Native quality histories are separate by direction, daytime/overnight,
-exit profile and selected quantity.
+exit profile and selected fixed quantity. Adaptive sizing has a separate
+quality profile and learns net R across quantities within its own streams.
 An invalid quote after startup, a data gap or an order fault still blocks the
 session. Initial connection notifications are distinguished from an actual
 interruption after the feed is ready. Real-time CME entitlement remains required.
@@ -74,7 +75,9 @@ and long/short. After eight eligible completed outcomes in one group, a
 nonpositive net tightens its efficiency threshold by 0.15, capped at 0.90; a
 positive recent aggregate restores the profile's base. Faulted outcomes count
 toward risk but do not train the entry filter. Runtime learning does not rewrite
-source or raise quantity. Broader alternatives remain separate paper tests.
+source. Optional [adaptive paper sizing](R2-ADAPTIVE-SIZING.md) changes quantity
+from completed, risk-normalized outcomes and the remaining loss budget; enable
+it explicitly. Broader alternatives remain separate paper tests.
 
 ## Run and verify
 

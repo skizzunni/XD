@@ -17,6 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from bot.contracts import contract_key, same_contract
 from bot.strategy import runner_stop
+from bot.sizing import adaptive_state, budget_quantity
 
 
 def extract_method(source, signature):
@@ -41,10 +42,12 @@ def main():
         "private bool IsRolling", "private bool UseTrendRunner", "private int MaximumHoldMinutes", "private static double RunnerStop", "private DateTime TradingDay", "private static bool Overnight", "private bool MarketOpen",
         "private DateTime FlattenAt", "private string ScheduledExitReason", "private DateTime LastEntryAt", "private double MaximumStopAtr", "private string QualityArm",
         "private double GapSeconds", "private double RealizedFor", "private QualityState QualityFor", "private static bool ConnectionShouldLatch",
+        "private string SizingArm", "private SizingState SizingFor", "private static SizingState AdaptiveSize", "private static int BudgetQuantity",
+        "private static void ValidateSizingHistory", "private void LoadResults",
         "private Dictionary<DateTime, SessionRule> LoadCalendar", "private DateTime CalendarTime",
         "private List<Tuple<DateTime,DateTime>> DateWindows"))
     scaffolding = "\n".join(extract_method(source, signature) for signature in (
-        "private class SessionRule", "private class ResultSample", "private class QualityState", "private class LotLedger"))
+        "private class SessionRule", "private class ResultSample", "private class QualityState", "private class LotLedger", "private class SizingState"))
     scaffolding += '''
     private enum MNQPaperArm {P0,C1,R1,R2}
     private MNQPaperArm Arm=MNQPaperArm.R2;
@@ -55,6 +58,9 @@ def main():
     private bool entryOvernight,AdaptiveQuality=true;
     private double RollingMinEfficiency=.4;
     private int PaperContracts=1;
+    private bool AdaptiveSizing=false;
+    private int MaximumPaperContracts=10;
+    private string riskLedgerPath;
     private System.Collections.Generic.List<ResultSample> results=new System.Collections.Generic.List<ResultSample>();
     private TimeZoneInfo easternZone=TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time");
     private string calendarHash;
@@ -114,6 +120,52 @@ def main():
         expected=side*(sum(exits)-sum(entries))*2-1.5*q
         body='var book=new LotLedger();'+''.join(f'book.Enter({v},1);' for v in entries)+''.join(f'book.Exit({v},1,{side},1.5);' for v in exits)
         checks.append('{'+body+f'if(Math.Abs(book.Net-({expected}))>1e-7 || !book.Complete(false,{q})) throw new Exception("Sized partial-fill P&L identity");'+'}')
+    for _ in range(300):
+        start=seeded.randrange(1,11);maximum=seeded.randrange(start,11)
+        outcomes=[{"net_r":seeded.choice((-.25,-1.,-1.25,0.,.25,1.5,4.)),"eligible":seeded.random()>.03}
+                  for i in range(seeded.randrange(221))]
+        expected=adaptive_state(outcomes,start,maximum)
+        values=','.join(str(s['net_r']) for s in outcomes)
+        eligibility=','.join(str(s['eligible']).lower() for s in outcomes)
+        body='{var values=new double[]{'+values+'};var eligibility=new bool[]{'+eligibility+'};var samples=new List<ResultSample>();'
+        body+='for(int i=0;i<values.Length;i++) samples.Add(new ResultSample {Net=values[i],QualityEligible=eligibility[i]});'
+        body+=f'var state=AdaptiveSize(samples,{start},{maximum});'
+        body+=f'if(state.Suggested!={expected["suggested_contracts"]} || state.Count!={expected["observations"]} || state.NextReview!={expected["next_review_in"]}'
+        body+=f' || state.GrowthEligible!={str(expected["growth_eligible"]).lower()} || state.Reason!={json.dumps(expected["reason"])}'
+        body+=f' || Math.Abs(state.NetR-({expected["recent_net_r"]}))>1e-8 || Math.Abs(state.DrawdownR-({expected["recent_drawdown_r"]}))>1e-8) throw new Exception("Adaptive sizing parity");'+'}'
+        checks.append(body)
+    for _ in range(1500):
+        suggested=seeded.randrange(1,11);reservation=seeded.randrange(1,3001)/2
+        remaining=seeded.choice((reservation*suggested,reservation*seeded.randrange(11)-1e-8,seeded.randrange(-100,10001)/2))
+        expected=budget_quantity(suggested,reservation,remaining)
+        checks.append(f'if(BudgetQuantity({suggested},{reservation},{remaining})!={expected}) throw new Exception("Sizing cash-boundary parity");')
+    checks.append('''
+        Arm=MNQPaperArm.R2;AdaptiveSizing=true;PaperContracts=2;ExitProfile=MNQPaperExit.TrendRunner;
+        var history=new List<ResultSample>();
+        for(int i=0;i<40;i++) {
+            string parent="position-"+i,complete=Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(parent+":complete")),size=Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(parent+":size"));
+            DateTime closed=day.AddHours(10).AddSeconds(i);
+            history.Add(new ResultSample {Id=complete,Arm="LEARNING:R2_RUNNER_RTH_AUTO",ClosedAt=closed,Direction=1,Net=10,QualityEligible=true});
+            history.Add(new ResultSample {Id=size,Arm="SIZE:R2_RUNNER_RTH",ClosedAt=closed,Direction=1,Net=1,QualityEligible=true});
+            history.Add(new ResultSample {Id="risk-"+i,Arm="RISK:R2_RUNNER_RTH_AUTO",ClosedAt=closed,Direction=1,Net=10});
+        }
+        ValidateSizingHistory(history);results=history;
+        if(QualityArm(false)!="R2_RUNNER_RTH_AUTO" || SizingFor(false,day.AddHours(11)).Suggested!=4 || SizingFor(true,day.AddHours(11)).Count!=0
+            || SizingFor(false,day.AddHours(10)).Count!=0 || RealizedFor(day,day.AddHours(11))!=400) throw new Exception("Sizing causal profiles and risk accounting");
+        string temp=Path.GetTempFileName();riskLedgerPath=temp;
+        File.WriteAllLines(temp,new[]{"trade_id,exit_et,arm,direction,net_usd,quality_eligible"}.Concat(history.Select(r=>r.Id+","+r.ClosedAt.ToString("yyyy-MM-ddTHH:mm:ss")+"-05:00,"+r.Arm+","+r.Direction+","+r.Net.ToString("R",CultureInfo.InvariantCulture)+","+r.QualityEligible)));
+        LoadResults();File.Delete(temp);
+        if(results.Count!=120 || SizingFor(false,day.AddHours(11)).Suggested!=4 || RealizedFor(day,day.AddHours(11))!=400) throw new Exception("Sizing survives CSV restart");
+        foreach(int missing in new int[] {0,1}) {
+            var broken=history.Where((r,i)=>i!=missing).ToList();bool refused=false;
+            try { ValidateSizingHistory(broken); } catch(InvalidOperationException) { refused=true; }
+            if(!refused) throw new Exception("Incomplete adaptive history must block restart");
+        }
+        var legacy=new List<ResultSample> {new ResultSample {Id="legacy",Arm="R2_RTH_Q2",Net=10,Direction=1,ClosedAt=day.AddHours(10),QualityEligible=true}};
+        ValidateSizingHistory(legacy);results=legacy;
+        if(SizingFor(false,day.AddHours(11)).Count!=0 || RealizedFor(day,day.AddHours(11))!=10) throw new Exception("Legacy history counts as cash, not invented R evidence");
+        results=new List<ResultSample>();AdaptiveSizing=false;PaperContracts=1;ExitProfile=MNQPaperExit.Fixed;
+    ''')
     for observed in (False,True):
         for owns in (False,True):
             for lost in (False,True):
@@ -128,7 +180,7 @@ def main():
         work = Path(directory)
         (work / "Check.csproj").write_text('<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework></PropertyGroup></Project>')
         (work / "NuGet.Config").write_text('<configuration><packageSources><clear /></packageSources></configuration>')
-        (work / "Program.cs").write_text("using System; using System.Linq; using System.Collections.Generic; using System.IO; using System.Globalization; using System.Security.Cryptography; class Program {" + scaffolding + methods + "static void Main(){new Program().Run();} void Run(){" + "\n".join(checks) + f'Console.WriteLine("Compiled C# contract/session/learning/calendar checks passed: {len(checks)} cases plus boundary assertions.");' + "}}")
+        (work / "Program.cs").write_text("using System; using System.Text; using System.Linq; using System.Collections.Generic; using System.IO; using System.Globalization; using System.Security.Cryptography; class Program {" + scaffolding + methods + "static void Main(){new Program().Run();} void Run(){" + "\n".join(checks) + f'Console.WriteLine("Compiled C# contract/session/learning/calendar/sizing checks passed: {len(checks)} cases plus boundary assertions.");' + "}}")
         environment = dict(os.environ, DOTNET_CLI_HOME=str(work / "cli"), DOTNET_CLI_TELEMETRY_OPTOUT="1", DOTNET_NOLOGO="1")
         subprocess.run([args.dotnet, "run", "--project", str(work / "Check.csproj"), "--configuration", "Release"], check=True, env=environment)
 
