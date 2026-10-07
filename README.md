@@ -1,6 +1,16 @@
 # MNQ strategy research and paper bot
 
-**R2 full-session scanning** is the Windows Sim101 default. It scans reviewed
+**Standalone Python + Databento is the current paper setup.** Extract the full
+package and double-click **START-DEMO.cmd** to verify the bot and browser with
+synthetic prices. Then arrange real-time CME data with Databento and run
+**START-PAPER.cmd**. [Follow the standalone setup guide](STANDALONE-START-HERE.md).
+It records ticks, paper positions, 30-question loss reviews, bounded learning
+and adaptive sizing in a durable local journal. The dashboard refreshes every
+five seconds and reports feed counters and warmup status. No NinjaTrader
+chart, Paper run ID or brokerage order connection is required for this version.
+Funded/Evaluation is a selectable paper risk profile; data access is separate.
+
+The older **R2 full-session scanner** remains the Windows Sim101 default. It scans reviewed
 CME sessions overnight and during the day, with separate rules and bounded
 quality learning for each profile. It has no daily trade-count cap and keeps
 one open position, with selectable 1–10 paper contracts. Start with [the R2 install guide](ninjatrader/R2-START-HERE.md)

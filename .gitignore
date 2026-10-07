@@ -1,6 +1,9 @@
 __pycache__/
 *.py[cod]
 .venv/
+.live-venv/
+.env
+.env.*
 runs/
 data/
 *.egg-info/

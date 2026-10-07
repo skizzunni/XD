@@ -4,13 +4,32 @@ Validated in the cloud development machine. Native NinjaTrader assemblies,
 Windows PowerShell execution, actual MNQ ticks/quotes and account fees are not
 available here; native compilation/playback and profitability are unverified.
 
+The standalone Databento version was exercised with installed SDK 0.87.0,
+actual SDK message objects, a mocked provider transport and synthetic prices.
+No data API key, live CME connection or paid data request was used. Its Windows
+launchers and actual account/data entitlements still require local acceptance.
+
 ## Checks completed
 
-- 151 automated tests: signal thresholds/freeze, ATR lag, Eastern/DST, early closes,
+- 174 automated tests: signal thresholds/freeze, ATR lag, Eastern/DST, early closes,
   rollover, news, bad/duplicate data, slippage caps, quote cost invariants,
   stop/time/target tick ordering, recovery reconstruction, unresolved-position
   preservation, account stages, net break-even/gap loss, research freeze/holdout
   lock and diagnostics/dashboard import.
+- Standalone checks cover actual Databento raw-symbol/record decoding, complete
+  prior cash-minute ATR coverage, historical cost caps, received-but-delayed
+  capture without fills, cold attachment, six-bar recovery after interruptions,
+  held-position preservation and fresh-quote fault exits with 30 loss questions,
+  batched duplicate rollback, disk failures before processing, single ownership,
+  immutable journal settings, checksum rejection and deterministic restart.
+  A 10,000-record dense batch capture restored every committed tick with no
+  invented trades. Mocked SDK subscription/capture and API-key redaction passed.
+  Loopback HTTP/DOM checks verify moving recorder counters, real paper positions,
+  loss questions, diagnostics, explicit synthetic clocks and no HTML writes.
+- Hash-locked Databento dependencies installed on Linux Python 3.12. The locked
+  binary dependencies resolved for Windows CPython 3.14 x64; Windows-only
+  certificate/pip dependencies were separately resolved. This is not a Windows
+  CMD execution test or evidence of actual CME entitlement.
 - Adaptive sizing tests cover growth from 2 through 10, loss streaks, weak
   windows, faults, a single outlier winner, quantity-independent net R,
   strictly prior/profile-specific observations, exact cash boundaries and
