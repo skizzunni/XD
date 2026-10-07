@@ -16,6 +16,7 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from bot.contracts import contract_key, same_contract
+from bot.strategy import runner_stop
 
 
 def extract_method(source, signature):
@@ -37,20 +38,23 @@ def main():
     methods = "\n".join(extract_method(source, signature) for signature in (
         "private static string MnqContractKey", "private static bool SameMnqContract"))
     methods += "\n"+"\n".join(extract_method(source, signature) for signature in (
-        "private bool IsRolling", "private DateTime TradingDay", "private static bool Overnight", "private bool MarketOpen",
+        "private bool IsRolling", "private bool UseTrendRunner", "private int MaximumHoldMinutes", "private static double RunnerStop", "private DateTime TradingDay", "private static bool Overnight", "private bool MarketOpen",
         "private DateTime FlattenAt", "private string ScheduledExitReason", "private DateTime LastEntryAt", "private double MaximumStopAtr", "private string QualityArm",
-        "private double GapSeconds", "private QualityState QualityFor", "private static bool ConnectionShouldLatch",
+        "private double GapSeconds", "private double RealizedFor", "private QualityState QualityFor", "private static bool ConnectionShouldLatch",
         "private Dictionary<DateTime, SessionRule> LoadCalendar", "private DateTime CalendarTime",
         "private List<Tuple<DateTime,DateTime>> DateWindows"))
     scaffolding = "\n".join(extract_method(source, signature) for signature in (
-        "private class SessionRule", "private class ResultSample", "private class QualityState"))
+        "private class SessionRule", "private class ResultSample", "private class QualityState", "private class LotLedger"))
     scaffolding += '''
     private enum MNQPaperArm {P0,C1,R1,R2}
     private MNQPaperArm Arm=MNQPaperArm.R2;
+    private enum MNQPaperExit {Fixed,TrendRunner}
+    private MNQPaperExit ExitProfile=MNQPaperExit.Fixed;
     private SessionRule session;
     private DateTime day;
     private bool entryOvernight,AdaptiveQuality=true;
     private double RollingMinEfficiency=.4;
+    private int PaperContracts=1;
     private System.Collections.Generic.List<ResultSample> results=new System.Collections.Generic.List<ResultSample>();
     private TimeZoneInfo easternZone=TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time");
     private string calendarHash;
@@ -84,8 +88,32 @@ def main():
         if(GapSeconds(day.AddHours(8).AddSeconds(-30),day.AddHours(8).AddMinutes(15).AddSeconds(30))!=60) throw new Exception("Reviewed break excluded from gap timeout");
         if(LastEntryAt(day.AddHours(7))!=day.AddHours(7).AddMinutes(55) || FlattenAt(day.AddHours(7))!=day.AddHours(7).AddMinutes(59) || ScheduledExitReason(day.AddHours(7))!="MARKET_BREAK_EXIT") throw new Exception("Reviewed-break entry and flatten deadlines");
         if(LastEntryAt(day.AddHours(9))!=day.AddHours(16).AddMinutes(45) || FlattenAt(day.AddHours(9))!=day.AddHours(16).AddMinutes(55) || ScheduledExitReason(day.AddHours(9))!="TIME_EXIT") throw new Exception("Post-break close deadlines recover");
+        ExitProfile=MNQPaperExit.TrendRunner;entryOvernight=true;if(MaximumHoldMinutes()!=45 || QualityArm(true)!="R2_RUNNER_OVERNIGHT" || QualityFor(1,day.AddHours(2)).Count!=0) throw new Exception("Runner overnight hold and isolated learning");
+        entryOvernight=false;if(MaximumHoldMinutes()!=90) throw new Exception("Runner daytime hold");ExitProfile=MNQPaperExit.Fixed;
+        var lots=new LotLedger();lots.Enter(20000,4);lots.Enter(20001,6);
+        double part=lots.Exit(20005,4,1,1.5);if(lots.Complete(false,10) || Math.Abs(part-29.2)>1e-7) throw new Exception("Partial exit cash and pending position");
+        lots.Exit(20003,6,1,1.5);if(!lots.Complete(false,10) || lots.Complete(true,10) || lots.Complete(false,11) || Math.Abs(lots.Net-49)>1e-7) throw new Exception("Weighted partial-fill accounting and completion");
+        results.Add(new ResultSample {Id="risk",Arm="RISK:R2_RTH",Net=6,ClosedAt=day.AddHours(3)});
+        results.Add(new ResultSample {Id="learn",Arm="LEARNING:R2_RTH",Net=6,ClosedAt=day.AddHours(3)});
+        if(RealizedFor(day,day.AddHours(4))!=-2) throw new Exception("Learning rows must not double-count restored cash risk");
+        session.TradeEnabled=false;if(GapSeconds(day.AddDays(-1).AddHours(22),day.AddHours(9).AddMinutes(30))!=0 || GapSeconds(day.AddHours(10),day.AddHours(10).AddMinutes(2))!=120) throw new Exception("Cash-only warmup coverage");session.TradeEnabled=true;
+        PaperContracts=2;if(QualityArm(true)!="R2_OVERNIGHT_Q2" || QualityFor(1,day.AddHours(2)).Count!=0) throw new Exception("Separate size learning");PaperContracts=1;
         Arm=MNQPaperArm.R1;if(MarketOpen(session,day.AddHours(2)) || TradingDay(day.AddHours(18))!=day) throw new Exception("R1 session regression");
     ''']
+    for _ in range(1000):
+        d=seeded.choice((-1,1));fill=20000;risk=seeded.randrange(4,100)*.25
+        peak=fill+d*seeded.randrange(0,200)*.25
+        stop=fill+d*seeded.randrange(-100,100)*.25
+        executable=peak-d*seeded.randrange(0,80)*.25
+        expected=runner_stop(d,fill,risk,peak,stop,executable)
+        checks.append(f'if(RunnerStop({d},{fill},{risk},{peak},{stop},{executable})!={expected}) throw new Exception("Runner stop parity");')
+    for _ in range(1000):
+        q=seeded.choice((1,2,5,10));side=seeded.choice((-1,1))
+        entries=[20000+seeded.randrange(-8,9)*.25 for n in range(q)]
+        exits=[20000+seeded.randrange(-40,41)*.25 for n in range(q)]
+        expected=side*(sum(exits)-sum(entries))*2-1.5*q
+        body='var book=new LotLedger();'+''.join(f'book.Enter({v},1);' for v in entries)+''.join(f'book.Exit({v},1,{side},1.5);' for v in exits)
+        checks.append('{'+body+f'if(Math.Abs(book.Net-({expected}))>1e-7 || !book.Complete(false,{q})) throw new Exception("Sized partial-fill P&L identity");'+'}')
     for observed in (False,True):
         for owns in (False,True):
             for lost in (False,True):

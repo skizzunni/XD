@@ -6,7 +6,7 @@ available here; native compilation/playback and profitability are unverified.
 
 ## Checks completed
 
-- 121 automated tests: signal thresholds/freeze, ATR lag, Eastern/DST, early closes,
+- 132 automated tests: signal thresholds/freeze, ATR lag, Eastern/DST, early closes,
   rollover, news, bad/duplicate data, slippage caps, quote cost invariants,
   stop/time/target tick ordering, recovery reconstruction, unresolved-position
   preservation, account stages, net break-even/gap loss, research freeze/holdout
@@ -24,7 +24,8 @@ available here; native compilation/playback and profitability are unverified.
   risk/targets, independent loss reviews, bounded quality tightening/recovery,
   exclusion of faulted samples and future results, news pauses/flattening and
   warmup-only dates. Prior poor outcomes change actual entry acceptance.
-- R2's two 400-session full-session synthetic runs each processed 552,000 ticks
+- R2's original fixed-exit implementation (commit `288f3ce`) passed two
+  400-session full-session synthetic runs, each processing 552,000 ticks
   and closed 17,100 trades, with no overlapping positions or reused entry IDs.
   Both had identical event SHA256
   `7aaf2ab1f0bcae4918f0ccda3719f2801c6846fa12582fc74c20337efe485576`
@@ -32,6 +33,13 @@ available here; native compilation/playback and profitability are unverified.
   `d7e7b49190e22f65a4f20fbbda0b6788f6de369d874c0cd9d6ecb2f7e2d29866`.
   Separate learning totals reconciled to 12,160 overnight and 4,940 daytime
   outcomes. Invented price paths cannot establish profitability.
+- The current two-contract TrendRunner passed two identical 80-session runs
+  with 110,400 ticks and 2,700 closed positions each, without overlap or reused
+  entry IDs. Learning counts reconciled. Event SHA256:
+  `80abb854ee8f61fe77a0e324edac8232540480781f0cdc4476d70ef397a20913`.
+  Tests exercise longer holds, profile crossings, monotone trailing stops,
+  actual gap losses and thirty diagnostics. Exit and 1/2/5/10 size comparison
+  CLIs freeze filters/costs and retain the same loss budget.
 - R2 tests cover Sunday reopening, midnight risk continuity, both DST weekends,
   maintenance/weekends, reviewed intraday breaks, early closes, quoted liquidity,
   cumulative losses, evening/08:30 news exits and later re-entry, lagged cash ATR,
@@ -45,13 +53,16 @@ available here; native compilation/playback and profitability are unverified.
 - Python compilation and unused/unbound-name analysis passed.
 - C# grammar parsing passed; this does not verify NinjaTrader API bindings.
 - The actual C# contract helpers were extracted, compiled with a checksum-verified
-  .NET 8 SDK and exercised against 4,425 cases, including all quarterly expiries,
+  .NET 8 SDK and exercised against 6,425 cases, including all quarterly expiries,
   wrong years/products and seeded invalid identifiers, plus actual extracted
   session, learning and calendar-loader methods. Boundary assertions check
   futures dates, break/close deadlines, profile learning and connection-startup
   classification. Reproduce with
   `python scripts/check_native_contracts.py --dotnet <dotnet-executable>`.
   This compiles the helpers only; full NinjaTrader compilation remains unrun.
+  Compiled assertions cover weighted partial-fill cash, pending executions and
+  avoiding doubled risk from learning rows. A thousand seeded cases verify
+  partial-fill P&L for sizes 1/2/5/10; another thousand verify trailing-stop parity.
 - Dashboard JavaScript syntax and functional checks passed for summary cards,
   380 trade rows, a 76-row loss filter, equity chart and 30-question review display.
 - The current R1 dashboard also passed JavaScript syntax and DOM-harness checks
@@ -62,6 +73,9 @@ available here; native compilation/playback and profitability are unverified.
   learning snapshots retain both profiles and overnight trades keep their
   futures date across midnight. Existing diagnostic/all filters and delayed
   delivery displays passed again against the final generated JavaScript.
+  Runner, open quantity, working stop and dashboard refresh timestamps also
+  passed DOM checks. HTTP tests show a fresh snapshot while a quote remains
+  ten minutes old. Partial fill rows produce one closed dashboard trade.
 - The pinned, checksum-verified timezone package was tested with OS zone lookup
   disabled, matching Windows' need for packaged IANA time zones.
 
@@ -131,6 +145,9 @@ available here; native compilation/playback and profitability are unverified.
   full-session news and a futures-date loss budget. P0/C1/R1 rules remain intact.
   Updated launcher defaults and package preflight to install every R2 dependency
   and use the same explicit run ID for setup and dashboard instructions.
+- Warmup-only dates require complete cash-session coverage for cash ATR20;
+  thin older overnight ticks do not invalidate otherwise complete cash history.
+  Enabled full-session dates still enforce their full-session coverage/freshness.
 
 ## Outstanding acceptance and research
 
@@ -140,6 +157,10 @@ news pauses and callback ordering on Windows. Cloud tests do not execute those
 native methods. Compare adaptive and fixed-filter versions on untouched future
 data; the P0/C1 research family intentionally rejects R1/R2. R2 also needs native
 acceptance across the evening open, midnight, news pauses and maintenance.
+Multi-contract native callbacks also require Windows acceptance for split fills,
+entry remainders, late fills, stop quantity changes and restart after a partial
+exit. The extracted accounting class was executed; NinjaTrader callback
+sequencing was not.
 
 Compile `MNQPlanPaper` in NinjaTrader 8; confirm native order and connection
 callbacks with market playback, including stop rejection/cancellation, disconnect

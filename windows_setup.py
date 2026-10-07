@@ -204,6 +204,7 @@ def dashboard_snapshot(home, run_id):
     logs = sorted(folder.glob("*_events.csv"))
     payload = native_payload(logs)
     payload["startup"] = {
+        "snapshot_at_utc": datetime.now(timezone.utc).isoformat(),
         "run_id": folder.name,
         "folder": str(folder),
         "state": "logs_found" if logs else "waiting_for_logs",

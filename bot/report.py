@@ -18,7 +18,7 @@ def max_drawdown(values):
 
 
 def stats(trades, extra_ticks=0, session_days=None):
-    net = [t.net_ticks - extra_ticks for t in trades]
+    net = [(t.net_ticks - extra_ticks)*t.quantity for t in trades]
     gross = [t.gross_ticks for t in trades]
     gains = sum(v for v in net if v > 0)
     losses = -sum(v for v in net if v < 0)
@@ -58,7 +58,7 @@ def block_bootstrap(trades, session_days, samples=2000, block_size=5, seed=1729)
         return [None, None]
     by_day = {d: [] for d in session_days}
     for t in trades:
-        by_day.setdefault(t.session, []).append(t.net_ticks)
+        by_day.setdefault(t.session, []).append(t.net_ticks*t.quantity)
     days = list(by_day)
     rng, means = random.Random(seed), []
     # Stationary bootstrap over chronological sessions, retaining no-trade sessions.
@@ -169,6 +169,8 @@ def engine_report(engine, synthetic=False):
         ),
         "event_hash": engine.event_hash(),
         "trade_count_cap": None if engine.config.strategy in {"R1", "R2"} else 1,
+        "exit_profile": engine.config.exit_profile,
+        "paper_contracts": engine.config.paper_contracts,
         "learning_samples": len(engine.learner.samples) + (len(engine.overnight_learner.samples) if engine.config.strategy == "R2" else 0),
         "learning_profiles": {"RTH": len(engine.learner.samples), **({"OVERNIGHT": len(engine.overnight_learner.samples)} if engine.config.strategy == "R2" else {})},
         "decision": "SYNTHETIC_SMOKE_TEST_ONLY"
@@ -211,6 +213,8 @@ def write_run(engine, directory, provenance):
     )
     write_json(directory / "trade_audits.json", engine.trade_audits)
     write_json(directory / "learning_state.json", engine.learner.samples)
+    if engine.config.strategy=="R2":
+        write_json(directory/"learning_state_by_profile.json",{"exit_profile":engine.config.exit_profile,"RTH":engine.learner.samples,"OVERNIGHT":engine.overnight_learner.samples})
     with (directory / "events.jsonl").open("w") as f:
         for event in engine.events:
             f.write(

@@ -56,8 +56,14 @@ class Engine:
     def gap_seconds(self, previous, current, session):
         return (current - previous).total_seconds()
 
+    def coverage_open(self, session):
+        return session.open
+
     def scheduled_exit_reason(self):
         return "TIME_EXIT"
+
+    def protect_profit(self, tick, executable):
+        pass
 
     def _reset_session(self):
         self.bars, self.current_bar = [], None
@@ -333,7 +339,7 @@ class Engine:
         if self.first_tick is None:
             self.first_tick = tick
             if (
-                tick.timestamp - session.open
+                tick.timestamp - self.coverage_open(session)
             ).total_seconds() > self.config.max_tick_gap_seconds:
                 self.fault(tick, "DATA_GAP")
         previous = self.session_last
@@ -418,20 +424,20 @@ class Engine:
             elif (
                 self.config.daily_profit_target_usd
                 and self.day_realized
-                + pos.direction
+                + (pos.direction
                 * (self.broker.quote(tick, -pos.direction)[0] - pos.entry_fill)
                 * 2
-                - self.config.round_turn_fees_usd
+                - self.config.round_turn_fees_usd)*pos.quantity
                 >= self.config.daily_profit_target_usd
             ):
                 self.blocked = True
                 self._exit(tick, "DAILY_PROFIT_TARGET")
             elif (
                 self.day_realized
-                + pos.direction
+                + (pos.direction
                 * (self.broker.quote(tick, -pos.direction)[0] - pos.entry_fill)
                 * 2
-                - self.config.round_turn_fees_usd
+                - self.config.round_turn_fees_usd)*pos.quantity
                 <= -self.config.session_loss_budget_usd
             ):
                 self.blocked = True
@@ -459,6 +465,8 @@ class Engine:
                     self.log(
                         tick, "order", "BREAK_EVEN_STOP", stop=stop, guaranteed=False
                     )
+            if self.broker.position:
+                self.protect_profit(tick, executable)
             return
         if self.blocked or self.attempted:
             return
@@ -548,9 +556,9 @@ class Engine:
             self.log(tick, "order", "REJECTED", detail="INITIAL_RISK_BELOW_COST_FLOOR")
             return
         if (
-            risk_ticks * TICK_VALUE
+            (risk_ticks * TICK_VALUE
             + self.config.round_turn_fees_usd
-            + self.config.slippage_ticks_per_side * TICK_VALUE
+            + self.config.slippage_ticks_per_side * TICK_VALUE)*self.config.paper_contracts
             > self.config.session_loss_budget_usd + min(0, self.day_realized)
         ):
             self.blocked = not self.rolling
@@ -570,7 +578,7 @@ class Engine:
             self.log(tick, "order", "REJECTED", detail="BREAK_EVEN_TRIGGER_BELOW_COSTS")
             return
         target = None
-        if c1_stop is not None:
+        if c1_stop is not None and self.config.exit_profile != "TrendRunner":
             # Round target away from fill; avoid an optimistic sub-tick target.
             target = round_outward(
                 fill + direction * (self.entry_rules or {}).get("target_r", 1.5) * risk_ticks * TICK, -direction
@@ -584,11 +592,12 @@ class Engine:
             "SUBMITTED",
             order_id=oid,
             direction=direction,
-            quantity=1,
+            quantity=self.config.paper_contracts,
             bid=tick.bid,
             ask=tick.ask,
         )
         self.broker.enter(tick, direction, stop, target)
+        self.best_executable = fill
         initial_net = (
             direction * (self.broker.quote(tick, -direction)[0] - fill) / TICK
             - self.config.round_turn_fees_usd / TICK_VALUE
@@ -610,7 +619,7 @@ class Engine:
             "calendar_reason": self._eligibility(self.session),
             "stop_implementation": "local paper engine; no broker server",
             "fill_implementation": "deterministic tick simulation",
-            "position_quantity": 1,
+            "position_quantity": self.config.paper_contracts,
             "day_realized_before": self.day_realized,
             "order_id": oid,
             "learning_at_entry": self.learning_at_entry,
@@ -632,7 +641,7 @@ class Engine:
             order_id=oid,
             execution_id=f"{oid}:fill",
             price=fill,
-            quantity=1,
+            quantity=self.config.paper_contracts,
             stop=stop,
             target=target,
         )
@@ -651,14 +660,14 @@ class Engine:
             "order",
             "SUBMITTED",
             order_id=f"{self.active_order_id}:exit",
-            quantity=1,
+            quantity=self.broker.position.quantity,
             detail=reason,
             bid=tick.bid,
             ask=tick.ask,
         )
         trade = self.broker.exit(tick, self.session, reason)
         self.trades.append(trade)
-        self.day_realized += trade.net_ticks * TICK_VALUE
+        self.day_realized += trade.net_ticks * TICK_VALUE*trade.quantity
         if self.audit:
             self.audit["day_realized_after"] = self.day_realized
         self.last_exit_time = tick.timestamp
@@ -682,13 +691,14 @@ class Engine:
                 self.active_order_id,
                 tick.timestamp,
                 trade.direction,
-                trade.net_ticks * TICK_VALUE,
+                trade.net_ticks * TICK_VALUE*trade.quantity,
             )
             self.log(
                 tick,
                 "learning",
                 "ADAPTATION_UPDATE",
                 regime=(self.entry_rules or {}).get("regime", "RTH"),
+                exit_profile=self.config.exit_profile,
                 **learner.state(
                     trade.direction, tick.timestamp + timedelta(microseconds=1)
                 ),

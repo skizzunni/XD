@@ -285,6 +285,10 @@ class BrowserDashboardTests(unittest.TestCase):
         self.assertEqual(timing["condition"], "DELAYED_OR_CLOCK_OFFSET")
         self.assertEqual(timing["delivery_lag_seconds"], 600)
         self.assertIn("Delivery lag at logged update", page)
+        self.assertIn("Dashboard refreshed at", page)
+        _, refreshed, _ = self.get()
+        self.assertGreater(refreshed["startup"]["snapshot_at_utc"], payload["startup"]["snapshot_at_utc"])
+        self.assertEqual(refreshed["live_status"][0]["timestamp"],payload["live_status"][0]["timestamp"])
         with urlopen(self.url + 'diagnostics.json', timeout=3) as response:
             report = json.loads(response.read())
         self.assertEqual(report["entry_checks"][0]["feed_timing"]["condition"], "DELAYED_OR_CLOCK_OFFSET")

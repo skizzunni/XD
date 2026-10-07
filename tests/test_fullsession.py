@@ -226,6 +226,18 @@ class FullSessionTests(unittest.TestCase):
             self.assertEqual(futures_day(s.open),start)
             self.assertEqual(futures_day(s.at(0,0)),start)
 
+    def test_cash_only_warmup_does_not_require_thin_old_overnight_ticks(self):
+        raw=json.loads(self.path.read_text());raw["sessions"][0]["trade_enabled"]=False
+        self.path.write_text(json.dumps(raw));self.calendar=FullSessionCalendar(Calendar(self.path))
+        s=next(iter(self.calendar.sessions.values()));e=FullSessionEngine(Config(strategy="R2"),self.calendar)
+        for t in ticks_for(s):
+            if s.cash_open<=t.timestamp<s.cash_close:e.process(t)
+        e.finish()
+        self.assertTrue(e.session_records[0]["complete"])
+        self.assertEqual(len(e.daily_ranges),1)
+        self.assertEqual(e.trades,[])
+        self.assertFalse(e.quality_fault)
+
     def test_shortened_reviewed_session_is_excluded_from_entries(self):
         raw=json.loads(self.path.read_text())
         raw["sessions"][0]["close"]=self.session.at(13,0).isoformat()

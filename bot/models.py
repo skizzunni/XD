@@ -41,6 +41,8 @@ class Config:
     overnight_target_r: float = 1.25
     overnight_max_hold_minutes: int = 20
     full_session_max_spread_ticks: int = 2
+    exit_profile: str = "Fixed"
+    paper_contracts: int = 1
 
     def __post_init__(self):
         if self.mode != "paper":
@@ -49,6 +51,10 @@ class Config:
             )
         if self.strategy not in {"P0", "C1", "R1", "R2"}:
             raise ValueError("strategy must be P0, C1, R1 or R2")
+        if self.exit_profile not in {"Fixed", "TrendRunner"} or self.exit_profile != "Fixed" and self.strategy != "R2":
+            raise ValueError("TrendRunner exits require the separate R2 paper experiment")
+        if type(self.paper_contracts) is not int or not 1<=self.paper_contracts<=10 or self.paper_contracts!=1 and self.strategy!="R2":
+            raise ValueError("Paper contracts must be 1-10; multiple contracts require R2")
         for f in fields(self):
             value = getattr(self, f.name)
             if f.type in {"int", "float", int, float}:
@@ -188,6 +194,7 @@ class Position:
     target: float | None = None
     initial_risk: float = 0.0
     break_even_armed: bool = False
+    quantity: int = 1
 
 
 @dataclass(frozen=True)
@@ -207,6 +214,7 @@ class Trade:
     all_in_ticks: int
     exit_reason: str
     news_flags: tuple[str, ...]
+    quantity: int = 1
 
 
 def round_outward(price, direction):

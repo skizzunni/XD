@@ -7,6 +7,7 @@ from .contracts import same_contract
 from .data import ET, Session
 from .engine import Engine
 from .learning import QualityLearner
+from .strategy import runner_stop
 
 
 def futures_day(timestamp):
@@ -75,12 +76,23 @@ class FullSessionEngine(Engine):
         return {
             "efficiency": max(self.config.rolling_min_efficiency, self.config.overnight_min_efficiency) if night else self.config.rolling_min_efficiency,
             "stop_atr": self.config.overnight_stop_atr if night else 0.20,
-            "target_r": self.config.overnight_target_r if night else 1.5,
-            "hold_minutes": self.config.overnight_max_hold_minutes if night else 30,
+            "target_r": None if self.config.exit_profile=="TrendRunner" else self.config.overnight_target_r if night else 1.5,
+            "hold_minutes": (45 if night else 90) if self.config.exit_profile=="TrendRunner" else self.config.overnight_max_hold_minutes if night else 30,
             "entry_start": self.session.open + timedelta(minutes=30),
             "entry_end": closing,
             "regime": "OVERNIGHT" if night else "RTH",
+            "exit_profile": self.config.exit_profile,
         }
+
+    def protect_profit(self, tick, executable):
+        if self.config.exit_profile != "TrendRunner":
+            return
+        p = self.broker.position
+        self.best_executable = max(self.best_executable, executable) if p.direction>0 else min(self.best_executable, executable)
+        stop = runner_stop(p.direction,p.entry_fill,p.initial_risk,self.best_executable,p.stop,executable)
+        if stop != p.stop:
+            p.stop = stop
+            self.log(tick,"order","TRAILING_STOP",stop=stop,peak=self.best_executable,initial_risk=p.initial_risk,guaranteed=False)
 
     def quality_learner(self, timestamp):
         return self.overnight_learner if self.overnight(timestamp) else self.learner
@@ -126,10 +138,15 @@ class FullSessionEngine(Engine):
             self.cash_last = tick
 
     def gap_seconds(self, previous, current, session):
+        if not session.trade_enabled:
+            return max(0,(min(current,session.cash_close)-max(previous,session.cash_open)).total_seconds())
         seconds = (current - previous).total_seconds()
         for start, end in session.globex_breaks:
             seconds -= max(0, (min(current, end) - max(previous, start)).total_seconds())
         return seconds
+
+    def coverage_open(self,session):
+        return session.open if session.trade_enabled else session.cash_open
 
     def _finish_session(self):
         if not self.session:

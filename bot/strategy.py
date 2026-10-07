@@ -6,6 +6,14 @@ from datetime import timedelta
 from .models import TICK, round_outward
 
 
+def runner_stop(direction, fill, risk, peak, stop, executable):
+    """One-R trailing stop after observed 1.5R; never loosen or cross the quote."""
+    if direction * (peak-fill) < 1.5*risk:
+        return stop
+    proposed = round_outward(peak-direction*risk, direction)
+    return proposed if direction*(proposed-stop) >= TICK and direction*(executable-proposed) > TICK else stop
+
+
 def momentum_direction(
     open_price, close_price, atr, long_threshold=0.1, short_threshold=0.1
 ):

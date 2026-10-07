@@ -41,10 +41,16 @@ chase cap and five-second expiry. Cost and remaining loss-budget checks apply.
 | Target | 1.5 initial R | 1.25 initial R |
 | Maximum holding time | 30 minutes | 20 minutes |
 | Observed bid/ask spread | At most 2 ticks | At most 2 ticks |
-| Open quantity | One MNQ | One MNQ |
+| Open quantity | Selected 1–10 MNQ | Selected 1–10 MNQ |
 
 R2 requires an observed paired bid/ask at entry; it does not replace missing
 quotes with a guessed spread. Native startup waits for the first paired quote.
+
+The native default remains one; select **Paper contracts=2** for the larger
+paper test. The table describes **Fixed** exits. The separate
+[TrendRunner option and sizing sweep](R2-EXIT-EXPERIMENT.md) retain these entry
+guards. Native quality histories are separate by direction, daytime/overnight,
+exit profile and selected quantity.
 An invalid quote after startup, a data gap or an order fault still blocks the
 session. Initial connection notifications are distinguished from an actual
 interruption after the feed is ready. Real-time CME entitlement remains required.

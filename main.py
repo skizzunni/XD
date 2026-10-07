@@ -33,6 +33,15 @@ def parser():
     run.add_argument("--calendar", required=True)
     run.add_argument("--out", required=True)
     run.add_argument("--strategy", choices=["P0", "C1", "R1", "R2"])
+    compare = commands.add_parser("compare-r2-exits", help="Compare fixed and trend-runner exits on identical paper ticks")
+    compare.add_argument("--ticks", required=True)
+    compare.add_argument("--calendar", required=True)
+    compare.add_argument("--out", required=True)
+    sizing=commands.add_parser("compare-r2-sizing",help="Paper exit/quantity sweep with an unchanged session loss budget")
+    sizing.add_argument("--ticks",required=True)
+    sizing.add_argument("--calendar",required=True)
+    sizing.add_argument("--out",required=True)
+    sizing.add_argument("--contracts",type=int,nargs="+",default=[1,2,5,10])
     demo = commands.add_parser(
         "demo", help="Generate synthetic fixtures and run both strategies"
     )
@@ -191,6 +200,28 @@ def main(argv=None):
             write_run(engine, root / strategy, provenance(arm_ticks, arm_calendar, cfg))
             reports[strategy] = engine_report(engine, True)
         print(json.dumps(reports, indent=2, allow_nan=False))
+    elif args.command in {"compare-r2-exits","compare-r2-sizing"}:
+        quantities=sorted(set(args.contracts)) if args.command=="compare-r2-sizing" else [config.paper_contracts]
+        if any(not 1<=q<=10 for q in quantities):raise ValueError("Paper comparison quantities must be 1-10")
+        root=Path(args.out)
+        root.mkdir(parents=True,exist_ok=False)
+        results={}
+        for quantity,profile in ((q,p) for q in quantities for p in ("Fixed","TrendRunner")):
+            label=f"Q{quantity}-{profile}" if args.command=="compare-r2-sizing" else profile
+            cfg=replace(config,strategy="R2",exit_profile=profile,adaptive_quality=False,paper_contracts=quantity)
+            try:
+                engine=replay(args.ticks,args.calendar,cfg)
+            except ReplayFailure as exc:
+                write_run(exc.engine,root/label,{**provenance(args.ticks,args.calendar,cfg),"failed":True,"error":str(exc)})
+                raise
+            write_run(engine,root/label,provenance(args.ticks,args.calendar,cfg))
+            results[label]=engine_report(engine,engine.calendar.synthetic)
+        comparison={"profiles":results,"tick_checksum":checksum(args.ticks),"calendar_checksum":checksum(args.calendar),
+                    "adaptive_quality":False,"automatic_promotion":False,
+                    "quantities":quantities,"session_loss_budget_usd":config.session_loss_budget_usd,
+                    "note":"Same quotes, per-contract costs, news and unchanged session loss budget. Larger quantities can reject otherwise valid signals when planned loss exceeds remaining budget. Replay does not model size-dependent market impact. Exit changes also change later entry availability. Synthetic outcomes are behavior tests; real historical outcomes require future validation."}
+        (root/"comparison.json").write_text(json.dumps(comparison,indent=2,allow_nan=False)+"\n")
+        print(json.dumps(comparison,indent=2,allow_nan=False))
     elif args.command == "replay":
         config = replace(config, strategy=args.strategy) if args.strategy else config
         try:

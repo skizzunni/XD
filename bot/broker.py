@@ -1,4 +1,4 @@
-"""One-contract simulated market fills. This module has no network/broker API."""
+"""One-position simulated market fills. This module has no network/broker API."""
 
 import math
 
@@ -42,6 +42,7 @@ class PaperBroker:
             tick.contract,
             target,
             abs(fill - stop),
+            quantity=self.config.paper_contracts,
         )
         return self.position
 
@@ -65,11 +66,12 @@ class PaperBroker:
             fill,
             gross,
             net,
-            self.config.round_turn_fees_usd,
+            self.config.round_turn_fees_usd*pos.quantity,
             execution,
             math.ceil(execution + self.config.round_turn_fees_usd / TICK_VALUE - 1e-9),
             reason,
             session.news_flags,
+            pos.quantity,
         )
         self.position = None
         return trade

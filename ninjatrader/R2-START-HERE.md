@@ -45,7 +45,9 @@ the same contract and adds the full-session **R2** paper experiment.
    | Allow historical orders | **False** |
    | Use break-even protection | **True** |
    | Maximum tick gap | **90 seconds** |
-   | Session loss limit and fees | Your chosen paper loss budget and actual fees; $100/$1 defaults remain provisional |
+   | R2 exit profile | **Fixed** for the baseline, or **TrendRunner** for the new longer-trend paper test |
+   | Paper contracts (R2 only) | **2** for the requested larger paper test; selectable **1–10** |
+   | Session loss limit and fees | Your chosen loss budget; default $100. The supplied statement shows **$1.50 per MNQ round trip**; verify your own account's costs |
 
    The existing saved P0/R1 instances retain their settings after a source update;
    selecting R2 explicitly is required. The orange “Primary series must be
@@ -63,3 +65,6 @@ setups fifteen minutes before the reviewed close and flattens five minutes
 before it. CME closes **17:00–18:00 ET daily** and over the weekend. The calendar
 currently covers enabled dates **October 7–30**; update it before November.
 Read [R2-FULL-SESSION.md](R2-FULL-SESSION.md) for all rules and validation limits.
+For the new runner test, use **r2-runner-sim101-001** (if unused) in both the
+launcher and Research → Paper run ID, and set **R2 exit profile=TrendRunner**.
+See [R2-EXIT-EXPERIMENT.md](R2-EXIT-EXPERIMENT.md) for the comparison procedure.

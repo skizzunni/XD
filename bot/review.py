@@ -132,9 +132,9 @@ def diagnose(trade, audit, events, config):
     )
     add(
         "Risk",
-        "Was quantity limited to one MNQ contract?",
+        "Was quantity within the selected paper-contract setting?",
         str(audit.get("position_quantity", "Unknown")),
-        "pass" if audit.get("position_quantity") == 1 else "unknown",
+        "pass" if audit.get("position_quantity") == config.paper_contracts else "unknown",
     )
     add(
         "Emotion",
@@ -251,16 +251,16 @@ def diagnose(trade, audit, events, config):
         "Risk",
         "Did the realized loss exceed the configured session loss budget?",
         str(
-            -audit.get("day_realized_after", trade.net_ticks * TICK_VALUE)
+            -audit.get("day_realized_after", trade.net_ticks * TICK_VALUE*trade.quantity)
             > config.session_loss_budget_usd
         ),
         "flag"
-        if -audit.get("day_realized_after", trade.net_ticks * TICK_VALUE)
+        if -audit.get("day_realized_after", trade.net_ticks * TICK_VALUE*trade.quantity)
         > config.session_loss_budget_usd
         else "pass",
         {
             "day_net_usd": audit.get(
-                "day_realized_after", trade.net_ticks * TICK_VALUE
+                "day_realized_after", trade.net_ticks * TICK_VALUE*trade.quantity
             ),
             "budget_usd": config.session_loss_budget_usd,
         },

@@ -3,11 +3,16 @@
 **R2 full-session scanning** is the Windows Sim101 default. It scans reviewed
 CME sessions overnight and during the day, with separate rules and bounded
 quality learning for each profile. It has no daily trade-count cap and keeps
-one open contract. Start with [the R2 install guide](ninjatrader/R2-START-HERE.md)
+one open position, with selectable 1–10 paper contracts. Start with [the R2 install guide](ninjatrader/R2-START-HERE.md)
 and [the full rules](ninjatrader/R2-FULL-SESSION.md). **R1** retains its cash-session
 experiment; **P0 session-open momentum** and **C1 fair value gap** preserve the
 original single-entry plan for comparison. Native routing accepts simulated
 accounts only.
+
+The new [trend-runner and size comparison](ninjatrader/R2-EXIT-EXPERIMENT.md)
+keeps fixed exits as a baseline. Select **R2 exit profile=TrendRunner** and
+**Paper contracts=2** for the requested larger simulation. Higher quantity does
+not raise the session loss budget automatically.
 
 The Python engine runs on Python 3.12+ with a pinned IANA `tzdata` package for
 Windows time zone support. The
