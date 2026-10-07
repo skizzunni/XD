@@ -3,6 +3,8 @@
 The latest package installs the full-session **R2** calendar and strategy default.
 For the requested overnight paper test, follow [R2-START-HERE.md](R2-START-HERE.md).
 The R1 instructions below describe the earlier cash-session experiment.
+For the R2 calendar initialization error, missing source, or dashboard startup
+failure, use [FIX-R2-STARTUP.md](FIX-R2-STARTUP.md).
 
 For the October 7 report with `UNRESOLVED_CONTRACT`, zero ATR, P0 and delayed
 quotes, follow [FIX-BLOCKED-SIM101.md](FIX-BLOCKED-SIM101.md). It installs the
@@ -28,6 +30,11 @@ dashboard tab and use the browser page opened by the new launcher.
 The browser server reads the existing CSV logs and generates each page in memory.
 It does not replace `dashboard.html` in OneDrive. Keep the launcher window open;
 Ctrl+C stops the dashboard server and leaves the strategy running.
+The dashboard-only launcher uses Python's standard library: it does not require
+the strategy source, calendar or `requirements.txt`. If strategy installation
+fails, the main launcher opens this browser with the setup error so saved logs
+remain available. The repair package also carries a SHA256-checked text copy of
+the strategy if the `.cs` file was moved out of the extracted folder.
 
 1. Download the updated GitHub ZIP. Right-click it → **Extract All**. Open the
    extracted `XD-...` folder containing `requirements.txt` and `START-SIM101.cmd`.

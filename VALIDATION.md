@@ -6,7 +6,7 @@ available here; native compilation/playback and profitability are unverified.
 
 ## Checks completed
 
-- 144 automated tests: signal thresholds/freeze, ATR lag, Eastern/DST, early closes,
+- 151 automated tests: signal thresholds/freeze, ATR lag, Eastern/DST, early closes,
   rollover, news, bad/duplicate data, slippage caps, quote cost invariants,
   stop/time/target tick ordering, recovery reconstruction, unresolved-position
   preservation, account stages, net break-even/gap loss, research freeze/holdout
@@ -69,7 +69,7 @@ available here; native compilation/playback and profitability are unverified.
 - Python compilation and unused/unbound-name analysis passed.
 - C# grammar parsing passed; this does not verify NinjaTrader API bindings.
 - The actual C# contract helpers were extracted, compiled with a checksum-verified
-  .NET 8 SDK and exercised against 8,226 cases, including all quarterly expiries,
+  .NET 8 SDK and exercised against 8,227 cases, including all quarterly expiries,
   wrong years/products and seeded invalid identifiers, plus actual extracted
   session, learning and calendar-loader methods. Boundary assertions check
   futures dates, break/close deadlines, profile learning and connection-startup
@@ -83,6 +83,9 @@ available here; native compilation/playback and profitability are unverified.
   and 1,500 cash boundaries check fitted quantities. Actual extracted risk CSV
   loading reconstructs growth and cash without double counting normalized SIZE
   rows; missing SIZE/LEARNING pairs block restart. Legacy cash remains readable.
+  Startup calendar assertions cover a saved daytime CSV, missing saved path,
+  checksum-verified R2 fallback, modified/missing fallback rejection, preserved
+  R1 selection and explicit malformed full-session validation.
 - Dashboard JavaScript syntax and functional checks passed for summary cards,
   380 trade rows, a 76-row loss filter, equity chart and 30-question review display.
 - The current R1 dashboard also passed JavaScript syntax and DOM-harness checks
@@ -100,6 +103,17 @@ available here; native compilation/playback and profitability are unverified.
   automatic reductions, the last risk-fitted quantity, actual closed-position
   quantity and sizing in the diagnostic download. Sizing updates never create
   fake trades. Existing diagnostic filters and stale-feed displays passed again.
+- Startup repair tests remove the `.cs` file from a nested extracted package and
+  install the exact native source from its verified text backup. A changed backup
+  is rejected before changing installed source/calendar; old legacy and dedicated
+  calendars are both backed up. Dashboard-only startup needs no source/calendar
+  or requirements file. Real HTTP snapshots retain installation errors and
+  `STARTUP_FAILED` events before live ticks, with no invented closed trades.
+  Browser DOM checks verify escaped setup errors and visible initialization
+  failures, alongside the existing sizing, diagnostic and stale-feed displays.
+  A separate process launched from a partial package with no source, calendar or
+  requirements file served its installation error and newly appended native
+  startup diagnostics over HTTP, without installing source or writing HTML.
 - The pinned, checksum-verified timezone package was tested with OS zone lookup
   disabled, matching Windows' need for packaged IANA time zones.
 
@@ -136,8 +150,16 @@ available here; native compilation/playback and profitability are unverified.
   events, a simulated locked HTML file, malformed/nonfinite snapshots, read
   failures, occupied ports and refusing arbitrary file requests. The
   dashboard-only launcher preserves installed source and calendar. Package
-  preflight catches missing strategy files before installation; run-ID selection
+  preflight validates source or its checked backup before installation; run-ID selection
   uses the same explicit value for installation instructions and the dashboard.
+- Decoupled browser startup from strategy installation and dependency setup.
+  Missing or moved native source recovers from the packaged checked text backup.
+  Installation errors remain visible in the browser. The installer writes a
+  dedicated `MNQCalendar-R2.csv`; saved R2 legacy/missing paths can resolve to
+  that pinned reviewed file, while explicitly malformed files still fail normal
+  validation. Calendar initialization errors are logged before rethrowing so the
+  dashboard explains why NinjaTrader disabled the instance. Actual native API
+  compilation and Windows launcher execution remain user-side acceptance steps.
 - Added native startup path messages and premarket status telemetry without
   changing the entry window, order routing or risk limits. Native execution of
   these messages remains unverified until compiled on Windows.

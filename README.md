@@ -27,10 +27,19 @@ On Windows, start with [the Sim101 current-market guide](ninjatrader/R2-START-HE
 Extract the ZIP and double-click **START-SIM101.cmd**. It installs the dependency,
 backs up older strategy/calendar files, installs the current dated calendar, and
 asks for the exact Paper run ID, and opens a local browser dashboard even while
-waiting for logs. If the strategy is already running, use **START-DASHBOARD.cmd**
-to view its logs without reinstalling or restarting it. Browser pages are
+waiting for logs. Missing `.cs` source can be recovered from the included
+SHA256-checked text backup. It installs `MNQCalendar-R2.csv` for the R2 settings;
+saved legacy calendar paths can resolve to this verified installed calendar.
+Follow [the startup repair steps](ninjatrader/FIX-R2-STARTUP.md) for the October 7
+calendar error or incomplete-package message. If the strategy is already running,
+use **START-DASHBOARD.cmd** to view its logs without reinstalling or restarting it.
+That dashboard needs neither source/calendar files nor a dependency installation.
+Strategy-installation errors also open the browser with an error notice. Browser pages are
 generated in memory, avoiding OneDrive HTML replacement errors. You compile with F5,
 connect your market-data feed and enable the strategy on Sim101.
+
+After editing the native source, run `python scripts/refresh_source_backup.py`
+to keep its packaged recovery copy and checksum current.
 
 ## Run locally
 

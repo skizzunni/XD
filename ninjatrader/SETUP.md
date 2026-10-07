@@ -5,12 +5,15 @@ installed NinjaTrader assemblies. C# syntax is checked in cloud; native compile,
 order lifecycle, connection handling, and playback tests are still required.
 The strategy is not yet deployed to your PC.
 
-For **Sim101 on current market data**, follow [SIM101-START-HERE.md](SIM101-START-HERE.md)
+For **R2 Sim101 on current market data**, follow [R2-START-HERE.md](R2-START-HERE.md)
 and double-click `START-SIM101.cmd` from the extracted project. The launcher
-locates its own files and installs the dated October 7–9 calendar. It preserves
+locates its own files and installs the reviewed October 7–30 full-session calendar
+as `MNQCalendar-R2.csv` (and the compatibility name `MNQCalendar.csv`). It preserves
 older files in backups and opens the browser dashboard with startup diagnostics.
 For an already running strategy, use `START-DASHBOARD.cmd` to read its logs
-without reinstalling source or changing the calendar. Compilation and
+without reinstalling source or changing the calendar. It needs no source,
+calendar or dependency installation. See [FIX-R2-STARTUP.md](FIX-R2-STARTUP.md)
+for source recovery and saved legacy calendar settings. Compilation and
 enabling still happen in NinjaTrader.
 
 1. Download and unzip the delivered `mnq-paper-bot.zip` on your Windows PC.

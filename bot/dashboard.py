@@ -52,6 +52,7 @@ BLOCK_HINTS = {
     "RISK_HISTORY_WRITE_FAILED": "The risk ledger could not be saved. Resolve its file access problem before restarting.",
     "DUPLICATE_RESULT": "A trade result was already recorded. Preserve the ledger and reconcile the duplicate.",
     "TERMINATED": "The strategy instance terminated. This dashboard can still display its saved logs; check the currently enabled instance in NinjaTrader.",
+    "STARTUP_FAILED": "The strategy could not finish initialization. Read the recorded error and calendar paths. Run the repair installer, compile with F5 and select the installed MNQCalendar-R2.csv before enabling a fresh run.",
 }
 
 
@@ -392,6 +393,7 @@ if(startup){
  $('startup').innerHTML='<p><strong>Paper run ID: '+esc(startup.run_id)+'</strong><br>Reading logs from '+esc(startup.folder)+'</p>'+(startup.snapshot_at_utc?'<p>Dashboard refreshed at '+esc(et(startup.snapshot_at_utc))+' ET. Quote timestamps below come from the market feed.</p>':'')+(startup.state==='waiting_for_logs'?'<p class="notice">Waiting for strategy startup logs. Match Research → Paper run ID in NinjaTrader. Open New → NinjaScript Output and Control Center → Log if initialization has not finished. No trade is required for logs to appear.</p>':startup.state==='read_error'?'<p class="notice">Cannot read the current logs: '+esc(startup.error)+'. The page will retry in five seconds.</p>':'<p>Strategy logs found. Live feed status below comes from the strategy, not a separate account connection.</p>')+(startup.other_runs||[]).map(r=>'<p>Other logs found: <strong>'+esc(r.run_id)+'</strong> · '+esc(r.account)+' / '+esc(r.strategy)+' · Last event '+esc(r.reason)+' at '+esc(r.timestamp)+'. Existing logs may belong to stopped runs.</p>').join('');
 }
 const accounts=[...new Set([...data.trades,...data.events].map(t=>t.account).filter(Boolean))]; $('account').innerHTML='<option value="all">All accounts</option>'+accounts.map(a=>'<option value="'+esc(a)+'">'+esc(a)+'</option>').join('');
+if(startup&&startup.setup_error)$('startup').innerHTML+='<p class="notice"><strong>Strategy installation needs repair.</strong><br>'+esc(startup.setup_error)+'<br>The dashboard can read existing logs while setup is repaired. Compile and configure NinjaTrader after installation succeeds.</p>';
 try{ $('account').value=localStorage.getItem('mnqAccount')||'all';if(!$('account').value)$('account').value='all';$('filter').value=localStorage.getItem('mnqFilter')||'all';}catch(e){}
 try{$('event-mode').value=localStorage.getItem('mnqEventMode')||'diagnostic';}catch(e){$('event-mode').value='diagnostic';}
 if(!['diagnostic','all','live'].includes($('event-mode').value))$('event-mode').value='diagnostic';

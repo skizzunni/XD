@@ -4,9 +4,7 @@ cd /d "%~dp0"
 echo MNQ browser dashboard - reads existing NinjaTrader logs.
 echo This launcher does not replace or enable your strategy.
 if not exist "windows_setup.py" goto incomplete
-python windows_setup.py check-package
-if errorlevel 1 goto failed
-python -m pip install --require-hashes --only-binary=:all: --disable-pip-version-check -r requirements.txt
+python windows_setup.py check-package --dashboard-only
 if errorlevel 1 goto failed
 python windows_setup.py launch --dashboard-only %*
 if errorlevel 1 goto failed

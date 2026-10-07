@@ -44,10 +44,14 @@ def main():
         "private double GapSeconds", "private double RealizedFor", "private QualityState QualityFor", "private static bool ConnectionShouldLatch",
         "private string SizingArm", "private SizingState SizingFor", "private static SizingState AdaptiveSize", "private static int BudgetQuantity",
         "private static void ValidateSizingHistory", "private void LoadResults",
+        "private static string ResolveCalendarPath",
         "private Dictionary<DateTime, SessionRule> LoadCalendar", "private DateTime CalendarTime",
         "private List<Tuple<DateTime,DateTime>> DateWindows"))
     scaffolding = "\n".join(extract_method(source, signature) for signature in (
         "private class SessionRule", "private class ResultSample", "private class QualityState", "private class LotLedger", "private class SizingState"))
+    for signature in ("private const string R2CalendarHeader", "private const string BundledR2CalendarSha256"):
+        start=source.index(signature)
+        scaffolding+="\n"+source[start:source.index(";",start)+1]
     scaffolding += '''
     private enum MNQPaperArm {P0,C1,R1,R2}
     private MNQPaperArm Arm=MNQPaperArm.R2;
@@ -176,6 +180,28 @@ def main():
     calendar_path=ROOT/"ninjatrader/calendars/mnq-dec26-full-session-2026-10-07-30/MNQCalendar.csv"
     checks.append(f'Arm=MNQPaperArm.R2;var approved=LoadCalendar({json.dumps(str(calendar_path))});if(approved.Count!=49 || approved.Values.Count(s=>s.TradeEnabled)!=18) throw new Exception("Native calendar loader");')
     checks.append('if(approved[new DateTime(2026,10,14)].GlobexNews.All(w=>w.Item1!=new DateTime(2026,10,14,8,25,0))) throw new Exception("Native 08:30 macro pause");')
+    legacy_path=ROOT/"ninjatrader/calendars/mnq-dec26-sim101-2026-10-07-09/MNQCalendar.csv"
+    checks.append(f'''
+        string calendarWork=Path.Combine(Path.GetTempPath(),"mnq-calendar-repair-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(calendarWork);
+        try {{
+            string old=Path.Combine(calendarWork,"old.csv"),installed=Path.Combine(calendarWork,"MNQCalendar-R2.csv"),custom=Path.Combine(calendarWork,"custom.csv");
+            File.Copy({json.dumps(str(legacy_path))},old);File.Copy({json.dumps(str(calendar_path))},installed);File.Copy(installed,custom);
+            string selected=ResolveCalendarPath(MNQPaperArm.R2,old,installed);
+            if(selected!=installed || LoadCalendar(selected).Count!=49) throw new Exception("Saved legacy path must resolve to verified full-session calendar");
+            if(ResolveCalendarPath(MNQPaperArm.R2,old+"missing",installed)!=installed) throw new Exception("Missing saved calendar path recovery");
+            if(ResolveCalendarPath(MNQPaperArm.R1,old,installed)!=old) throw new Exception("Preserve original-arm calendar selection");
+            File.AppendAllText(installed,"\\n");
+            if(ResolveCalendarPath(MNQPaperArm.R2,custom,installed)!=custom) throw new Exception("Preserve explicit full-session selection");
+            bool refused=false;try {{ResolveCalendarPath(MNQPaperArm.R2,old,installed);}} catch(InvalidOperationException) {{refused=true;}}
+            if(!refused) throw new Exception("Tampered installed fallback must be rejected");
+            File.Delete(installed);refused=false;try {{ResolveCalendarPath(MNQPaperArm.R2,old,installed);}} catch(InvalidOperationException) {{refused=true;}}
+            if(!refused) throw new Exception("Missing R2 fallback must be rejected");
+            var invalid=File.ReadAllLines(custom);invalid[2]=invalid[2].Replace(",16:00,",",17:00,");File.WriteAllLines(custom,invalid);
+            if(ResolveCalendarPath(MNQPaperArm.R2,custom,installed)!=custom) throw new Exception("Malformed selected full calendar must reach validation");
+            refused=false;try {{LoadCalendar(custom);}} catch(InvalidOperationException) {{refused=true;}}
+            if(!refused) throw new Exception("Malformed explicit calendar must not silently fall back");
+        }} finally {{Directory.Delete(calendarWork,true);}}
+    ''')
     with tempfile.TemporaryDirectory(prefix="mnq-native-contracts-") as directory:
         work = Path(directory)
         (work / "Check.csproj").write_text('<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework></PropertyGroup></Project>')

@@ -5,6 +5,7 @@ import csv
 from contextlib import redirect_stdout
 from datetime import datetime, timezone
 import errno
+import hashlib
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import io
 import json
@@ -19,22 +20,40 @@ import webbrowser
 
 PROJECT = Path(__file__).resolve().parent
 SIM_PRESET = PROJECT / "ninjatrader/calendars/mnq-dec26-full-session-2026-10-07-30"
+R2_CALENDAR_NAME = "MNQCalendar-R2.csv"
 
 
-def check_package(calendar_dir=SIM_PRESET):
-    required = [
-        PROJECT / name
-        for name in (
-            "requirements.txt",
-            "main.py",
-            "bot/data.py",
-            "bot/dashboard.py",
-            "bot/contracts.py",
-            "bot/fullsession.py",
-            "bot/sizing.py",
-            "ninjatrader/MNQPlanPaper.cs",
-        )
-    ] + [Path(calendar_dir) / name for name in ("calendar.json", "MNQCalendar.csv")]
+def strategy_source():
+    source = PROJECT / "ninjatrader/MNQPlanPaper.cs"
+    if source.is_file():
+        return source
+    backup = PROJECT / "ninjatrader/MNQPlanPaper.source.txt"
+    manifest = PROJECT / "ninjatrader/MNQPlanPaper.source.sha256"
+    if backup.is_file() and manifest.is_file():
+        expected = manifest.read_text(encoding="ascii").strip()
+        actual = hashlib.sha256(backup.read_bytes()).hexdigest()
+        if len(expected) != 64 or actual != expected:
+            raise ValueError("The packaged strategy source backup failed its SHA256 check; download the complete repair ZIP.")
+        return backup
+    raise ValueError(f"Strategy source missing: {source}. The repair ZIP also includes a verified .source.txt backup.")
+
+
+def check_package(calendar_dir=SIM_PRESET, dashboard_only=False):
+    if dashboard_only:
+        required = [PROJECT / "bot/dashboard.py"]
+    else:
+        required = [
+            PROJECT / name
+            for name in (
+                "requirements.txt",
+                "main.py",
+                "bot/data.py",
+                "bot/dashboard.py",
+                "bot/contracts.py",
+                "bot/fullsession.py",
+                "bot/sizing.py",
+            )
+        ] + [Path(calendar_dir) / name for name in ("calendar.json", "MNQCalendar.csv")]
     missing = [str(path) for path in required if not path.is_file()]
     if missing:
         raise ValueError(
@@ -42,6 +61,8 @@ def check_package(calendar_dir=SIM_PRESET):
             + "\n".join(missing)
             + "\nDownload the complete ZIP, choose Extract All, and run START-SIM101.cmd inside the extracted folder."
         )
+    if not dashboard_only:
+        strategy_source()
 
 
 def validate_run_id(run_id):
@@ -161,9 +182,12 @@ def install(home, calendar_dir=SIM_PRESET, run_id="r2-sim101-001"):
     )
     backups = home / "MNQPaper/install-backups" / stamp
     updates = (
-        (PROJECT / "ninjatrader/MNQPlanPaper.cs", strategies / "MNQPlanPaper.cs"),
+        (strategy_source(), strategies / "MNQPlanPaper.cs"),
         (calendar_source, home / "MNQCalendar.csv"),
+        (calendar_source, home / R2_CALENDAR_NAME),
     )
+    if updates[0][0].suffix == ".txt":
+        print(f"Using verified strategy source backup: {updates[0][0]}")
     for source, destination in updates:
         content = source.read_bytes()
         if destination.exists():
@@ -185,6 +209,7 @@ def install(home, calendar_dir=SIM_PRESET, run_id="r2-sim101-001"):
     print(
         f"Calendar allows {active[0]} through {active[-1]}; earlier dates only build ATR history."
     )
+    print(f"R2 Frozen calendar CSV: {home / R2_CALENDAR_NAME}")
     print(
         "In NinjaTrader: compile with F5; connect real-time CME market data; use MNQ DEC26, 5 Minute, CME US Index Futures ETH, Sim101, R2, Funded."
     )
@@ -197,7 +222,7 @@ def install(home, calendar_dir=SIM_PRESET, run_id="r2-sim101-001"):
     return backups
 
 
-def dashboard_snapshot(home, run_id):
+def dashboard_snapshot(home, run_id, setup_error=None):
     from bot.dashboard import native_payload
 
     validate_run_id(run_id)
@@ -209,6 +234,7 @@ def dashboard_snapshot(home, run_id):
         "run_id": folder.name,
         "folder": str(folder),
         "state": "logs_found" if logs else "waiting_for_logs",
+        "setup_error": setup_error,
         "other_runs": [
             item for item in discover_runs(home)
             if item["run_id"] != folder.name
@@ -245,7 +271,7 @@ def diagnostic_report(payload):
     }
 
 
-def create_dashboard_server(home, run_id, port=8765):
+def create_dashboard_server(home, run_id, port=8765, setup_error=None):
     """Serve only generated snapshots; do not write HTML into OneDrive or expose files."""
     from bot.dashboard import html_document, native_payload
 
@@ -262,7 +288,7 @@ def create_dashboard_server(home, run_id, port=8765):
                 self.send_error(404)
                 return
             try:
-                payload = dashboard_snapshot(home, run_id)
+                payload = dashboard_snapshot(home, run_id, setup_error)
                 body = (json.dumps(diagnostic_report(payload), ensure_ascii=True, allow_nan=False) if route == "/diagnostics.json" else html_document(payload)).encode("utf-8")
             except (OSError, ValueError, csv.Error, KeyError, TypeError) as exc:
                 payload = native_payload([])
@@ -272,6 +298,7 @@ def create_dashboard_server(home, run_id, port=8765):
                     "state": "read_error",
                     "error": str(exc),
                     "other_runs": [],
+                    "setup_error": setup_error,
                 }
                 payload["note"] = "Fresh account and feed status are unavailable because the log snapshot could not be read."
                 body = (json.dumps(diagnostic_report(payload), ensure_ascii=True, allow_nan=False) if route == "/diagnostics.json" else html_document(payload)).encode("utf-8")
@@ -299,7 +326,7 @@ def create_dashboard_server(home, run_id, port=8765):
         return ThreadingHTTPServer(("127.0.0.1", 0), DashboardHandler)
 
 
-def watch(home, run_id, once=False, port=8765):
+def watch(home, run_id, once=False, port=8765, setup_error=None):
     validate_run_id(run_id)
     folder = home / "MNQPaper" / run_id
     output = folder / "dashboard.html"
@@ -310,7 +337,7 @@ def watch(home, run_id, once=False, port=8765):
         refresh_dashboard(folder, output, home)
         webbrowser.open(output.resolve().as_uri())
         return output
-    with create_dashboard_server(home, run_id, port) as server:
+    with create_dashboard_server(home, run_id, port, setup_error) as server:
         url = f"http://127.0.0.1:{server.server_port}/"
         print(f"Browser dashboard: {url}")
         print("Snapshots refresh every 5 seconds. The server reads logs and does not replace dashboard.html.")
@@ -321,7 +348,7 @@ def watch(home, run_id, once=False, port=8765):
 
 
 def launch(home, run_id=None, dashboard_only=False):
-    check_package()
+    check_package(dashboard_only=True)
     print(f"NinjaTrader user-data folder: {home}")
     runs = discover_runs(home)
     for item in runs:
@@ -337,7 +364,12 @@ def launch(home, run_id=None, dashboard_only=False):
     validate_run_id(run_id)
     print(f"Strategy and dashboard must both use Paper run ID: {run_id}")
     if not dashboard_only:
-        install(home, run_id=run_id)
+        try:
+            install(home, run_id=run_id)
+        except Exception as exc:
+            print(f"Installation failed: {exc}")
+            print("Opening the read-only dashboard with this error. This launcher has not compiled or enabled NinjaTrader.")
+            return watch(home, run_id, setup_error=str(exc))
     return watch(home, run_id)
 
 
@@ -348,7 +380,8 @@ def main(argv=None):
         help="Actual NinjaTrader 8 Documents folder, including redirected/OneDrive paths",
     )
     commands = parser.add_subparsers(dest="command", required=True)
-    commands.add_parser("check-package", help="Check that the downloaded ZIP was fully extracted")
+    package = commands.add_parser("check-package", help="Check installation or dashboard files")
+    package.add_argument("--dashboard-only", action="store_true", help="Check only the read-only browser runtime; strategy and calendar files are not needed")
     launcher = commands.add_parser("launch", help="Choose the matching run ID, install, and open the dashboard")
     launcher.add_argument("--run-id", help="Exact Research > Paper run ID; omit to choose interactively")
     launcher.add_argument("--dashboard-only", action="store_true", help="Read existing logs without installing or changing the NinjaTrader strategy")
@@ -368,8 +401,8 @@ def main(argv=None):
     )
     args = parser.parse_args(argv)
     if args.command == "check-package":
-        check_package()
-        print("Complete extracted bot package verified.")
+        check_package(dashboard_only=args.dashboard_only)
+        print("Dashboard runtime verified." if args.dashboard_only else "Complete extracted bot package verified.")
         return 0
     home = ninja_home(args.ninjatrader_home)
     if args.command == "install":

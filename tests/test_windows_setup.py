@@ -2,8 +2,10 @@ from contextlib import redirect_stdout
 from datetime import datetime, timedelta, timezone
 import io
 import json
+import hashlib
 from pathlib import Path
 import tempfile
+import shutil
 import threading
 import unittest
 from unittest.mock import patch
@@ -38,6 +40,69 @@ class WindowsSetupTests(unittest.TestCase):
         self.assertEqual(strategy.read_bytes(), (windows_setup.PROJECT / "ninjatrader/MNQPlanPaper.cs").read_bytes())
         self.assertEqual(calendar.read_bytes(), (windows_setup.SIM_PRESET / calendar.name).read_bytes())
         self.assertFalse(again.exists())
+        self.assertEqual((self.home / windows_setup.R2_CALENDAR_NAME).read_bytes(), calendar.read_bytes())
+
+    def damaged_project(self):
+        project = self.root / "nested-extracted-folder" / "MNQBot"
+        project.mkdir(parents=True)
+        for name in ("requirements.txt", "main.py", "windows_setup.py"):
+            shutil.copy2(windows_setup.PROJECT / name, project / name)
+        for name in ("bot", "ninjatrader"):
+            shutil.copytree(windows_setup.PROJECT / name, project / name, ignore=shutil.ignore_patterns("__pycache__"))
+        (project / "ninjatrader/MNQPlanPaper.cs").unlink()
+        return project
+
+    def test_source_backup_is_current_and_missing_cs_installs_the_real_strategy(self):
+        source = (windows_setup.PROJECT / "ninjatrader/MNQPlanPaper.cs").read_bytes()
+        backup = (windows_setup.PROJECT / "ninjatrader/MNQPlanPaper.source.txt").read_bytes()
+        digest = (windows_setup.PROJECT / "ninjatrader/MNQPlanPaper.source.sha256").read_text().strip()
+        self.assertEqual(backup, source)
+        self.assertEqual(hashlib.sha256(backup).hexdigest(), digest)
+        project = self.damaged_project()
+        with patch("windows_setup.PROJECT", project), redirect_stdout(io.StringIO()) as output:
+            windows_setup.check_package()
+            windows_setup.install(self.home)
+        self.assertIn("verified strategy source backup", output.getvalue())
+        self.assertEqual((self.strategies / "MNQPlanPaper.cs").read_bytes(), source)
+        self.assertEqual((self.home / windows_setup.R2_CALENDAR_NAME).read_bytes(),
+                         (windows_setup.SIM_PRESET / "MNQCalendar.csv").read_bytes())
+
+    def test_tampered_source_backup_is_rejected_before_changing_ninjatrader(self):
+        project = self.damaged_project()
+        with (project / "ninjatrader/MNQPlanPaper.source.txt").open("ab") as f:
+            f.write(b"\n// altered source\n")
+        installed = self.strategies / "MNQPlanPaper.cs"
+        installed.write_text("personal source")
+        with patch("windows_setup.PROJECT", project):
+            with self.assertRaisesRegex(ValueError, "SHA256"):
+                windows_setup.install(self.home)
+        self.assertEqual(installed.read_text(), "personal source")
+        self.assertFalse((self.home / windows_setup.R2_CALENDAR_NAME).exists())
+
+    def test_dashboard_only_starts_without_source_calendar_or_requirements(self):
+        project = self.root / "dashboard-only"
+        (project / "bot").mkdir(parents=True)
+        (project / "bot/dashboard.py").write_text("# browser runtime")
+        with patch("windows_setup.PROJECT", project), patch("windows_setup.install") as install, patch("windows_setup.watch") as watch, redirect_stdout(io.StringIO()):
+            self.assertEqual(windows_setup.main(["check-package", "--dashboard-only"]), 0)
+            windows_setup.launch(self.home, "repair-run", dashboard_only=True)
+        install.assert_not_called()
+        watch.assert_called_once_with(self.home, "repair-run")
+
+    def test_install_failure_opens_dashboard_with_the_actual_error(self):
+        with patch("windows_setup.install", side_effect=ValueError("Strategy source missing")), patch("windows_setup.watch") as watch, redirect_stdout(io.StringIO()) as output:
+            windows_setup.launch(self.home, "repair-run")
+        watch.assert_called_once_with(self.home, "repair-run", setup_error="Strategy source missing")
+        self.assertIn("Installation failed", output.getvalue())
+
+    def test_legacy_and_dedicated_calendars_are_both_preserved_on_update(self):
+        dedicated = self.home / windows_setup.R2_CALENDAR_NAME
+        legacy = self.home / "MNQCalendar.csv"
+        dedicated.write_text("my prior full-session calendar")
+        legacy.write_text("my prior cash calendar")
+        with redirect_stdout(io.StringIO()): backup = windows_setup.install(self.home)
+        self.assertEqual((backup / dedicated.name).read_text(), "my prior full-session calendar")
+        self.assertEqual((backup / legacy.name).read_text(), "my prior cash calendar")
 
     def test_missing_ninjatrader_does_not_create_fake_installation(self):
         with self.assertRaisesRegex(ValueError, "Strategies folder missing"):
@@ -187,6 +252,36 @@ class BrowserDashboardTests(unittest.TestCase):
         self.assertEqual(headers["Cache-Control"], "no-store")
         self.assertFalse(self.home.exists())
         self.assertEqual(self.server.server_address[0], "127.0.0.1")
+
+    def test_install_failure_is_available_on_browser_and_diagnostic_download(self):
+        server = windows_setup.create_dashboard_server(self.home, self.run_id, port=0, setup_error="Strategy source missing <details>")
+        worker = threading.Thread(target=server.serve_forever, kwargs={"poll_interval": .01}, daemon=True)
+        worker.start()
+        try:
+            address = f"http://127.0.0.1:{server.server_port}/"
+            with urlopen(address, timeout=3) as response:
+                page = response.read().decode()
+            payload = json.loads(page.split('<script id="payload" type="application/json">', 1)[1].split('</script>', 1)[0])
+            self.assertEqual(payload["startup"]["setup_error"], "Strategy source missing <details>")
+            self.assertIn("Strategy installation needs repair", page)
+            with urlopen(address + "diagnostics.json", timeout=3) as response:
+                self.assertEqual(json.load(response)["startup"]["setup_error"], payload["startup"]["setup_error"])
+            self.assertFalse(self.home.exists())
+        finally:
+            server.shutdown(); worker.join(timeout=2); server.server_close()
+
+    def test_failed_native_initialization_reports_its_calendar_error_before_any_ticks(self):
+        self.folder.mkdir(parents=True)
+        (self.folder / "Sim101_R2_events.csv").write_text(
+            'sequence,timestamp,account,stage,arm,reason,details\n'
+            '1,2026-10-07T17:40:00-04:00,Sim101,Funded,R2,STARTUP_FAILED,message=R2 calendar missing;installed_calendar=MNQCalendar-R2.csv\n'
+            '2,2026-10-07T17:40:01-04:00,Sim101,Funded,R2,TERMINATED,Inspect startup error\n'
+        )
+        _, payload, _ = self.get()
+        checks = payload["entry_checks"][0]["recorded_checks"]
+        self.assertIn("STARTUP_FAILED", {c["reason"] for c in checks})
+        self.assertEqual(payload["trades"], [])
+        self.assertEqual(payload["live_status"], [])
 
     def test_browser_reads_new_ticks_without_replacing_locked_html(self):
         self.folder.mkdir(parents=True)

@@ -4,6 +4,12 @@ The uploaded diagnostics confirm a contract-name comparison defect, old **P0**
 settings and delayed MNQ data. The update accepts `MNQ DEC26` and `MNQ 12-26` as
 the same contract and adds the full-session **R2** paper experiment.
 
+For the October 7 **R2 needs the reviewed full-session calendar** initialization
+error, or a launcher that cannot find `MNQPlanPaper.cs`, follow
+[FIX-R2-STARTUP.md](FIX-R2-STARTUP.md). The repair package includes a checked source
+backup, installs a dedicated R2 calendar, and starts the browser independently of
+strategy installation. NinjaTrader still needs F5 and the settings below.
+
 1. **Disable the old bot.** In NinjaTrader, disable every old `MNQPlanPaper`
    instance. Confirm Sim101 has no open MNQ position or outstanding MNQ orders.
    Keep existing logs, risk history and setup claims.
@@ -40,7 +46,7 @@ the same contract and adds the full-session **R2** paper experiment.
    | Strategy arm | **R2** |
    | Account stage | **Funded** |
    | Research → Paper run ID | **r2-sim101-001**, or the unused ID entered in the launcher |
-   | Frozen calendar CSV | The installed `MNQCalendar.csv` in your actual NinjaTrader user-data folder |
+   | Frozen calendar CSV | The installed `MNQCalendar-R2.csv` in your actual NinjaTrader user-data folder; copy the exact path printed by the launcher |
    | Platform display time zone ID | **Eastern Standard Time** |
    | Allow historical orders | **False** |
    | Use break-even protection | **True** |
@@ -54,6 +60,11 @@ the same contract and adds the full-session **R2** paper experiment.
    The existing saved P0/R1 instances retain their settings after a source update;
    selecting R2 explicitly is required. The orange “Primary series must be
    5-minute MNQ” messages are fixed by the chart/data-series settings above.
+   R2 now resolves a missing or recognized legacy daytime calendar to the
+   checksum-verified installed R2 calendar. An explicitly selected full-session
+   calendar still undergoes normal validation; malformed files are not replaced
+   silently. Initialization failures are recorded as `STARTUP_FAILED` for the
+   browser, including the requested and installed paths.
 7. **Enable and check the browser.** Look for **R2**, **REALTIME_STARTED**,
    **FEED_READY**, positive ATR20 and `completed_atr_sessions=20`. Your contract
    should map to `contract_key=MNQ 12-26`. The browser shows the exact run ID,
