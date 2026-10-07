@@ -126,6 +126,22 @@ startup. Initialization or historical-data loading may not have finished. Copy
 any error text from these windows; “Waiting for strategy logs” alone does not
 establish a compile error or a disconnected feed.
 
+If entries are blocked and the ledger appears to contain only `LIVE_STATUS`,
+use the new **Entry diagnostics** section above it. It groups recorded checks
+for the latest logged session and shows their original evidence plus a suggested
+check. These records can include earlier resolved checks; the page labels them
+as recorded evidence rather than claiming a single current cause. A blocked flag
+with no recorded explanation stays unknown.
+
+The ledger defaults to **Diagnostic events**, filtering out `LIVE_STATUS` before
+applying its display limit. You can choose **All events** or **Live tick updates**.
+**Download diagnostic report** exports the recorded checks and all non-status
+events from the selected run, including events too old for the visible table.
+Send the relevant reason/evidence or that report when diagnosing a block.
+Restarting the dashboard does not clear a strategy block. Confirm the actual
+enabled strategy arm and feed state in NinjaTrader; a stale P0 row may belong to
+an older or stopped instance even if you intend to run R1.
+
 Orders/fills are visible immediately in Control Center **Orders/Executions**.
 Completed trades appear in the dashboard with estimated fee-adjusted P&L,
 drawdown, account stage and loss diagnostics. Reconcile the ledger with

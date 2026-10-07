@@ -244,6 +244,33 @@ class BrowserDashboardTests(unittest.TestCase):
         finally:
             extra.server_close()
 
+    def test_download_report_preserves_blocker_before_status_rows(self):
+        self.folder.mkdir(parents=True)
+        ledger = self.folder / "Sim101_P0_events.csv"
+        ledger.write_text('sequence,timestamp,account,stage,arm,reason,details\n1,2026-10-07T09:30:00-04:00,Sim101,Funded,P0,ATR_WARMUP,ATR20=0\n')
+        with ledger.open('a') as stream:
+            for index in range(2, 1002):
+                stream.write(f'{index},2026-10-07T11:20:00-04:00,Sim101,Funded,P0,LIVE_STATUS,price=31300;blocked=True\n')
+        before = ledger.read_bytes()
+        with urlopen(self.url + 'diagnostics.json', timeout=3) as response:
+            report = json.loads(response.read())
+            self.assertIn('attachment', response.headers['Content-Disposition'])
+            self.assertIn('application/json', response.headers['Content-Type'])
+            self.assertEqual(response.headers['Cache-Control'], 'no-store')
+        self.assertEqual(report['startup']['run_id'], self.run_id)
+        self.assertEqual(report['entry_checks'][0]['recorded_checks'][0]['reason'], 'ATR_WARMUP')
+        self.assertEqual([row['reason'] for row in report['diagnostic_events']], ['ATR_WARMUP'])
+        self.assertEqual(ledger.read_bytes(), before)
+        self.assertFalse((self.folder / 'dashboard.html').exists())
+
+    def test_download_report_without_logs_stays_unknown_and_creates_no_files(self):
+        with urlopen(self.url + 'diagnostics.json', timeout=3) as response:
+            report = json.loads(response.read())
+        self.assertEqual(report['startup']['state'], 'waiting_for_logs')
+        self.assertEqual(report['entry_checks'], [])
+        self.assertEqual(report['total_event_count'], 0)
+        self.assertFalse(self.home.exists())
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -36,6 +36,10 @@ stage, events and 30 diagnostic questions for each loss. It refreshes the local
 file every 5 seconds; this offline export needs no web service or account
 credentials. Regenerate the export when its underlying replay files change.
 The live native dashboard instead runs a small Python browser server on your PC.
+Its entry diagnostics retain recorded blocking checks even after many routine
+tick updates. The ledger filters out `LIVE_STATUS` by default, and the browser
+can download the complete non-status diagnostic report. Neither feature resets
+a trading guard or independently reads the brokerage account.
 
 ## Account stages
 

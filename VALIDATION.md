@@ -6,7 +6,7 @@ available here; native compilation/playback and profitability are unverified.
 
 ## Checks completed
 
-- 82 automated tests: signal thresholds/freeze, ATR lag, Eastern/DST, early closes,
+- 91 automated tests: signal thresholds/freeze, ATR lag, Eastern/DST, early closes,
   rollover, news, bad/duplicate data, slippage caps, quote cost invariants,
   stop/time/target tick ordering, recovery reconstruction, unresolved-position
   preservation, account stages, net break-even/gap loss, research freeze/holdout
@@ -72,6 +72,12 @@ available here; native compilation/playback and profitability are unverified.
 - Added native startup path messages and premarket status telemetry without
   changing the entry window, order routing or risk limits. Native execution of
   these messages remains unverified until compiled on Windows.
+- Added an entry-diagnostics summary and a downloadable report. Tests reproduce
+  an early block hidden behind 1,500 tick-status rows, distinguish old-session
+  checks and P0/R1 ledgers, preserve unknown causes, and avoid treating ordinary
+  R1 setup rejections as session blocks. HTTP tests verify that the report removes
+  routine status rows while preserving the earlier evidence without changing
+  the source CSV or creating HTML files. Native trading code was unchanged.
 
 ## Outstanding acceptance and research
 

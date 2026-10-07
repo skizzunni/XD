@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 import errno
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import io
+import json
 import os
 from pathlib import Path
 import shutil
@@ -225,6 +226,20 @@ def refresh_dashboard(folder, output, home=None):
     return payload["startup"]["state"] == "logs_found"
 
 
+def diagnostic_report(payload):
+    return {
+        "schema": "mnq-entry-diagnostics-v1",
+        "generated_at_utc": datetime.now(timezone.utc).isoformat(),
+        "source": payload["source"],
+        "startup": payload.get("startup"),
+        "entry_checks": payload.get("entry_checks", []),
+        "live_status": payload.get("live_status", []),
+        "total_event_count": len(payload["events"]),
+        "diagnostic_events": [event for event in payload["events"] if event.get("reason") != "LIVE_STATUS"],
+        "note": "Recorded ledger evidence only. Existing logs do not prove that the strategy is currently enabled or connected. The report changes no trading controls.",
+    }
+
+
 def create_dashboard_server(home, run_id, port=8765):
     """Serve only generated snapshots; do not write HTML into OneDrive or expose files."""
     from bot.dashboard import html_document, native_payload
@@ -237,12 +252,13 @@ def create_dashboard_server(home, run_id, port=8765):
                 self.send_response(204)
                 self.end_headers()
                 return
-            if self.path.split("?", 1)[0] != "/":
+            route = self.path.split("?", 1)[0]
+            if route not in ("/", "/diagnostics.json"):
                 self.send_error(404)
                 return
             try:
                 payload = dashboard_snapshot(home, run_id)
-                body = html_document(payload).encode("utf-8")
+                body = (json.dumps(diagnostic_report(payload), ensure_ascii=True, allow_nan=False) if route == "/diagnostics.json" else html_document(payload)).encode("utf-8")
             except (OSError, ValueError, csv.Error, KeyError, TypeError) as exc:
                 payload = native_payload([])
                 payload["startup"] = {
@@ -253,9 +269,11 @@ def create_dashboard_server(home, run_id, port=8765):
                     "other_runs": [],
                 }
                 payload["note"] = "Fresh account and feed status are unavailable because the log snapshot could not be read."
-                body = html_document(payload).encode("utf-8")
+                body = (json.dumps(diagnostic_report(payload), ensure_ascii=True, allow_nan=False) if route == "/diagnostics.json" else html_document(payload)).encode("utf-8")
             self.send_response(200)
-            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Type", ("application/json" if route == "/diagnostics.json" else "text/html") + "; charset=utf-8")
+            if route == "/diagnostics.json":
+                self.send_header("Content-Disposition", f'attachment; filename="mnq-{run_id}-diagnostics.json"')
             self.send_header("Content-Length", str(len(body)))
             self.send_header("Cache-Control", "no-store")
             self.send_header("X-Content-Type-Options", "nosniff")
