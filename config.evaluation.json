@@ -1,0 +1,12 @@
+{
+  "mode": "paper",
+  "strategy": "P0",
+  "round_turn_fees_usd": 1.00,
+  "spread_ticks": 1,
+  "slippage_ticks_per_side": 1,
+  "costs_calibrated": false,
+  "session_loss_budget_usd": 100.00,
+  "research_loss_budget_usd": 500.00,
+  "daily_profit_target_usd": 750.00,
+  "break_even_trigger_r": 1.0
+}

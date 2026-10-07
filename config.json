@@ -1,0 +1,21 @@
+{
+  "mode": "paper",
+  "strategy": "P0",
+  "long_threshold": 0.10,
+  "short_threshold": 0.10,
+  "atr_sessions": 20,
+  "stop_atr": 0.20,
+  "round_turn_fees_usd": 1.00,
+  "spread_ticks": 1,
+  "slippage_ticks_per_side": 1,
+  "slippage_cap_ticks": 4,
+  "costs_calibrated": false,
+  "session_loss_budget_usd": 100.00,
+  "research_loss_budget_usd": 500.00,
+  "max_tick_gap_seconds": 90,
+  "bootstrap_samples": 2000,
+  "bootstrap_block_sessions": 5,
+  "pbo_blocks": 8,
+  "minimum_segment_trades": 150,
+  "seed": 1729
+}

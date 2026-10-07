@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "source": "SCHEMA EXAMPLE ONLY: replace with verified exchange sessions, actual contracts, roll decisions and frozen macro calendar",
+  "synthetic": true,
+  "news_as_of": "2026-10-06T08:00:00-04:00",
+  "sessions": [
+    {
+      "date": "2026-10-07",
+      "open": "2026-10-07T09:30:00-04:00",
+      "close": "2026-10-07T16:00:00-04:00",
+      "contract": "MNQ 12-26",
+      "roll_day": false,
+      "news": {"flags": [], "releases": []}
+    }
+  ]
+}
