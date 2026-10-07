@@ -1,11 +1,13 @@
 # MNQ strategy research and paper bot
 
-**R1 continuous intraday scanning** is the default paper strategy requested after
-the original plan. It has no daily trade-count cap, keeps one open contract, and
-uses a bounded quality filter based on completed trade outcomes. **P0 session-open
-momentum** and **C1 fair value gap** preserve the original single-entry plan for
-comparison. No real-account order route is implemented. See [the R1 rules and
-live dashboard guide](ninjatrader/R1-SCANNER.md).
+**R2 full-session scanning** is the Windows Sim101 default. It scans reviewed
+CME sessions overnight and during the day, with separate rules and bounded
+quality learning for each profile. It has no daily trade-count cap and keeps
+one open contract. Start with [the R2 install guide](ninjatrader/R2-START-HERE.md)
+and [the full rules](ninjatrader/R2-FULL-SESSION.md). **R1** retains its cash-session
+experiment; **P0 session-open momentum** and **C1 fair value gap** preserve the
+original single-entry plan for comparison. Native routing accepts simulated
+accounts only.
 
 The Python engine runs on Python 3.12+ with a pinned IANA `tzdata` package for
 Windows time zone support. The
@@ -13,7 +15,7 @@ NinjaTrader strategy is delivered as source and still requires native Windows
 compilation, a real calendar, data, and playback acceptance. Synthetic results
 are implementation checks, never evidence of profitable trading.
 
-On Windows, start with [the Sim101 current-market guide](ninjatrader/SIM101-START-HERE.md).
+On Windows, start with [the Sim101 current-market guide](ninjatrader/R2-START-HERE.md).
 Extract the ZIP and double-click **START-SIM101.cmd**. It installs the dependency,
 backs up older strategy/calendar files, installs the current dated calendar, and
 asks for the exact Paper run ID, and opens a local browser dashboard even while
@@ -49,9 +51,10 @@ loss budget, and break-even protection after 1 initial R of favorable movement.
 do not connect a brokerage account. Loss budgets are containment settings; gaps
 and slippage can produce a larger loss. Break-even is estimated net of fees and
 exit slippage, and cannot guarantee a non-losing fill.
-R1 counts fees and realized results cumulatively across trades, reserves new stop
+R1/R2 count fees and realized results cumulatively across trades, reserve new stop
 risk against the remaining budget, and can trade a later fresh setup after a
-normal loss. Data/order faults still block entries.
+normal loss. R2's futures session advances at 18:00 ET, so midnight does not reset
+the budget. Data/order faults still block entries.
 
 ```bash
 python main.py accounts set my-evaluation --stage evaluation --loss-limit 100
@@ -62,7 +65,9 @@ python main.py --account my-evaluation replay --ticks data/ticks.csv --calendar 
 
 `runs/accounts.json` stores local labels only. `config.json` freezes the plan
 baseline with no break-even/target overlay. `config.evaluation.json` and
-`config.funded-paper.json` contain the requested account overlays. An explicit
+`config.funded-paper.json` contain the requested account overlays.
+`config.full-session-paper.json` selects the R2 full-session experiment; the
+older Python CLI default remains R1 for reproducible comparisons. An explicit
 `--config` selects that profile unless `--account` is also supplied. Research
 defaults to the baseline and forbids silently importing account overlays.
 
@@ -169,8 +174,8 @@ research work; none has passed on actual data yet. Never retune a failed holdout
 
 ## NinjaTrader
 
-Follow [the Windows setup and dashboard guide](ninjatrader/SETUP.md).
-Import `MNQPlanPaper`, choose **Arm=R1** and **Account stage=Funded**, and use
+Follow [the R2 Windows setup and dashboard guide](ninjatrader/R2-START-HERE.md).
+Import `MNQPlanPaper`, choose **Arm=R2** and **Account stage=Funded**, and use
 `Sim101` or `Playback101`. Keep C1 as a separate replay comparison. Funded/evaluation
 classification applies separately to each strategy instance's selected account.
 Live/account API adapters are absent. A two-day screenshot does not establish

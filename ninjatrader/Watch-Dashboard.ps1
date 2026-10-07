@@ -1,6 +1,6 @@
 param(
     [string]$NinjaTraderHome = (Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'NinjaTrader 8'),
-    [string]$RunId = 'r1-sim101-001',
+    [string]$RunId = 'r2-sim101-001',
     [string]$PythonExe = 'python'
 )
 $ErrorActionPreference = 'Stop'

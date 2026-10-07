@@ -39,6 +39,9 @@ class Session:
     news_flags: tuple[str, ...]
     releases: tuple[datetime, ...]
     trade_enabled: bool = True
+    globex_open: datetime | None = None
+    globex_close: datetime | None = None
+    globex_breaks: tuple = ()
 
     @property
     def late_news(self):
@@ -61,6 +64,13 @@ class Session:
 
     def news_paused(self, timestamp):
         return any(start <= timestamp < end for start, end in self.news_windows)
+
+    @property
+    def globex_news_windows(self):
+        if self.globex_open is None:
+            return ()
+        return tuple(sorted((max(self.globex_open, r-timedelta(minutes=5)), min(self.globex_close, r+timedelta(minutes=10)))
+                            for r in self.releases if self.globex_open <= r < self.globex_close))
 
     @property
     def eligibility(self):
@@ -129,9 +139,23 @@ class Calendar:
                 if not release.get("name") or "revision" not in release:
                     raise ValueError("News release requires name and revision history")
                 ts = parse_time(release["timestamp"])
-                if ts.date() != day:
+                if ts.date() != day and not (row.get("globex") and parse_time(row["globex"]["open"]) <= ts < parse_time(row["globex"]["close"])):
                     raise ValueError("News date differs from session")
                 releases.append(ts)
+            extended = row.get("globex")
+            extended_open = extended_close = None
+            extended_breaks = ()
+            if extended is not None:
+                extended_open, extended_close = parse_time(extended["open"]), parse_time(extended["close"])
+                if (extended_open >= start or extended_close < end
+                        or extended_close.date() != day
+                        or extended_open.time() != time(18)
+                        or extended_open.date() != day - timedelta(days=1)
+                        or extended_close.time() > time(17)):
+                    raise ValueError("Invalid reviewed Globex session boundaries")
+                extended_breaks = tuple((parse_time(a), parse_time(b)) for a, b in extended.get("breaks", []))
+                if any(not extended_open < a < b < extended_close for a, b in extended_breaks):
+                    raise ValueError("Invalid reviewed Globex break")
             self.sessions[day] = Session(
                 day,
                 start,
@@ -141,6 +165,7 @@ class Calendar:
                 tuple(news["flags"]),
                 tuple(releases),
                 row.get("trade_enabled", True),
+                extended_open, extended_close, extended_breaks,
             )
         if not self.sessions:
             raise ValueError("Calendar contains no sessions")

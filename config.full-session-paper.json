@@ -1,0 +1,16 @@
+{
+  "mode": "paper",
+  "strategy": "R2",
+  "round_turn_fees_usd": 1.0,
+  "spread_ticks": 1,
+  "slippage_ticks_per_side": 1,
+  "costs_calibrated": false,
+  "session_loss_budget_usd": 100.0,
+  "daily_profit_target_usd": 0.0,
+  "break_even_trigger_r": 1.0,
+  "overnight_min_efficiency": 0.55,
+  "overnight_stop_atr": 0.10,
+  "overnight_target_r": 1.25,
+  "overnight_max_hold_minutes": 20,
+  "full_session_max_spread_ticks": 2
+}

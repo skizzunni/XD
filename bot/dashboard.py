@@ -1,8 +1,10 @@
 """Standalone interactive HTML, usable as a local file without a web server."""
 
 import csv
+from datetime import datetime, timezone
 import io
 import json
+import math
 from pathlib import Path
 
 
@@ -21,7 +23,7 @@ def details(value):
 BLOCK_HINTS = {
     "ATR_WARMUP": "ATR20 history is not ready. Load complete individual-contract bars and ticks for at least 20 completed prior RTH sessions; the setup guide uses 60 calendar days.",
     "DATA_GAP": "A missing or incomplete tick/bar interval was recorded. Repair history or the live feed and reconcile positions before restarting the strategy.",
-    "STALE_FEED": "The strategy stopped receiving regular-session ticks within its timeout. Check moving quotes, connection state and whether the strategy is still enabled.",
+    "STALE_FEED": "The latest tick timestamp exceeded the strategy's freshness limit. Moving delayed quotes can also trigger this check. Check real-time CME entitlement, the Windows clock, connection state and whether the strategy is enabled.",
     "DATA_QUALITY": "An invalid price, volume or quote was recorded. Inspect the data source and the original event details.",
     "BAD_TIMESTAMP": "Tick timestamps moved backward. Check the feed, display timezone and tick history.",
     "UNRESOLVED_CONTRACT": "The frozen calendar contract did not match the strategy instrument. Read the logged contract and compare it with the calendar before changing either.",
@@ -37,6 +39,8 @@ BLOCK_HINTS = {
     "UNRESOLVED_POSITION": "A position remained unresolved across sessions. Reconcile account orders and positions.",
     "DAILY_RISK_LIMIT": "A configured session loss or evaluation profit limit was reached. Preserve the session risk records.",
     "LOSS_BUDGET_EXIT": "The session loss control requested an exit. Preserve the session risk records.",
+    "TIME_EXIT": "The scheduled flatten time was reached. Re-entry waits for the next reviewed strategy session; R2 uses the CME futures trading day.",
+    "QUOTE_WAIT": "The initial live bid/ask pair is not ready. R2 waits for paired quotes before entering; check the real-time CME connection if this persists.",
     "DAILY_PROFIT_TARGET": "The evaluation profit target requested an exit. Check the account stage and configured target.",
     "DUPLICATE_BAR": "A repeated closed bar was recorded. Inspect history and the feed.",
     "DUPLICATE_EXECUTION": "A duplicate execution was recorded. Reconcile the native execution ledger.",
@@ -47,6 +51,55 @@ BLOCK_HINTS = {
     "DUPLICATE_RESULT": "A trade result was already recorded. Preserve the ledger and reconcile the duplicate.",
     "TERMINATED": "The strategy instance terminated. This dashboard can still display its saved logs; check the currently enabled instance in NinjaTrader.",
 }
+
+
+def feed_timing(live, observed_at=None):
+    """Compare recorded timestamps; do not equate updating delayed prices with live data."""
+    if not live or live.get("account") != "Sim101":
+        return None
+    observed_at = observed_at or datetime.now(timezone.utc)
+    values = details(live.get("details"))
+
+    def timestamp(value):
+        try:
+            parsed = datetime.fromisoformat(value)
+            return parsed if parsed.tzinfo is not None else None
+        except (TypeError, ValueError):
+            return None
+
+    tick = timestamp(live.get("timestamp"))
+    if tick is None:
+        return None
+    received = timestamp(values.get("received_at_et"))
+    try:
+        limit = float(values.get("max_tick_gap_seconds", ""))
+    except (TypeError, ValueError):
+        limit = float("nan")
+    native_limit = math.isfinite(limit) and limit > 0
+    limit = limit if native_limit else 90
+    age = (observed_at - tick).total_seconds()
+    receipt_age = (observed_at - received).total_seconds() if received else None
+    lag = (received - tick).total_seconds() if received else None
+    if lag is not None and lag > limit:
+        condition = "DELAYED_OR_CLOCK_OFFSET"
+        message = f"At the logged update, the tick was already {lag:.0f}s behind the PC clock. Check delayed CME data and Windows time synchronization; updating prices alone do not establish a current feed."
+    elif age < -5 or lag is not None and lag < -5:
+        condition = "CLOCK_AHEAD"
+        message = "The tick timestamp is ahead of the reference clock. Check Windows time synchronization and NinjaTrader's display timezone."
+    elif age > limit:
+        condition = "OLD_TICK_TIMESTAMP"
+        message = f"The latest tick timestamp is {age:.0f}s old at this dashboard snapshot. Check delayed CME data, clock settings, the connection and the enabled instance; these saved logs alone cannot distinguish a delayed feed from a stopped run."
+    else:
+        condition = "RECENT_TICK_TIMESTAMP"
+        message = "The latest logged tick timestamp is recent. This timestamp check does not establish entry eligibility or an independent account connection."
+    return {
+        "condition": condition, "message": message,
+        "observed_at_utc": observed_at.astimezone(timezone.utc).isoformat(),
+        "tick_age_seconds": age, "received_at_et": values.get("received_at_et"),
+        "receipt_age_seconds": receipt_age, "delivery_lag_seconds": lag,
+        "freshness_limit_seconds": limit,
+        "limit_source": "native" if native_limit else "dashboard_default",
+    }
 
 
 def entry_diagnostics(rows, ledger):
@@ -88,6 +141,7 @@ def entry_diagnostics(rows, ledger):
         "last_tick": live["timestamp"] if live else None,
         "blocked": True if blocked == "true" else False if blocked == "false" else None,
         "latest_event": latest["reason"], "latest_event_time": latest["timestamp"],
+        "feed_timing": feed_timing(live),
         "recorded_checks": list(flags.values()),
     }
 
@@ -121,7 +175,7 @@ def native_payload(paths):
                     **d,
                 }
             if e["reason"] == "ADAPTATION_UPDATE":
-                learning[(e.get("account"), e.get("arm"), d.get("direction"))] = {
+                learning[(e.get("account"), e.get("arm"), d.get("direction"), d.get("regime", "RTH"))] = {
                     "account": e.get("account"),
                     "strategy": e.get("arm"),
                     "timestamp": e["timestamp"],
@@ -144,6 +198,8 @@ def native_payload(paths):
                     "stage": e.get("stage"),
                     "strategy": e.get("arm"),
                     "direction": int(d["direction"]) if d.get("direction") else None,
+                    "futures_day": d.get("futures_day"),
+                    "regime": d.get("regime"),
                 }
             elif "net_usd" in d and e["reason"] != "LOSS_RECORDED":
                 if not entry:
@@ -156,7 +212,7 @@ def native_payload(paths):
                     continue
                 trade = {
                     **entry,
-                    "session": e["timestamp"][:10],
+                    "session": entry.get("futures_day") or e["timestamp"][:10],
                     "exit_time": e["timestamp"],
                     "exit_reason": e["reason"],
                     "net_usd": float(d["net_usd"]),
@@ -272,7 +328,7 @@ def engine_learning_events(directory):
     latest = {}
     for event in events:
         if event["reason"] == "ADAPTATION_UPDATE":
-            latest[event["direction"]] = event
+            latest[(event["direction"], event.get("regime", "RTH"))] = event
     return latest.values()
 
 
@@ -322,18 +378,18 @@ function draw(){
  if(unavailable){['pnl','count','winrate','dd'].forEach(id=>$(id).textContent='—');}
  $('pending').innerHTML=unavailable?'<p>Position status unavailable until the logs can be read.</p>':data.pending_positions.map(p=>'<p class="notice">'+esc(p.account)+': '+esc(p.reason)+'</p>').join('')||'<p>No unmatched positions in the imported ledger.</p>';
  const live=(data.live_status||[]).filter(s=>account==='all'||s.account===account);
- const phases={OUTSIDE_RTH:'Outside the 09:30–16:00 ET session; R1 setups start at 10:00 ET',NO_CALENDAR_SESSION:'No reviewed calendar session for this date',WAITING_R1_WINDOW:'Outside the 10:00–15:45 ET R1 setup window',POSITION_OPEN:'Managing an open position',ENTRY_PENDING:'Entry order pending',BLOCKED:'Entries blocked',NEWS_PAUSE:'Scheduled news pause',SCANNING:'Scanning for eligible setups'};
- $('live').innerHTML=live.map(s=>'<p><strong>'+esc(s.account)+' / '+esc(s.strategy)+'</strong> · Price '+esc(s.price)+' · Open contracts '+esc(s.open_qty)+' · Estimated open P&amp;L '+money(Number(s.unrealized_usd))+' · Session realized '+money(Number(s.day_net_usd))+'<br>'+esc(phases[s.phase]||((s.blocked==='True'||s.blocked===true)?'Entries blocked':(s.news_pause==='True'||s.news_pause===true)?'Scheduled news pause':'Scanning for eligible setups'))+' · Latest tick '+esc(et(s.timestamp))+' <span class="tick-age" data-time="'+esc(s.timestamp)+'"></span></p>').join('')||'<p>Waiting for live ticks from the strategy. Read the event ledger for initialization and history status. Historical replay has no live connection.</p>';
- $('entry-checks').innerHTML=(data.entry_checks||[]).filter(c=>account==='all'||c.account===account).map(c=>'<div class="notice"><strong>'+esc(c.account)+' / '+esc(c.strategy)+' · Latest logged session '+esc(c.logged_session)+'</strong><p>'+(c.latest_event==='TERMINATED'?'This ledger ends with TERMINATED. Check the currently enabled strategy instance.':c.blocked===true?'The latest logged tick reports entries blocked.':c.blocked===false?'The latest logged tick reports entries unblocked.':'No blocked/unblocked state is available for this logged session.')+'</p>'+(c.strategy==='P0'?'<p>Recorded arm is P0, which uses late-afternoon entries. The requested continuous scanner is R1; check the selected arm in NinjaTrader.</p>':'')+((c.recorded_checks||[]).length?'<p>Recorded checks for this session; earlier checks may no longer be active:</p>'+c.recorded_checks.map(f=>'<p><strong>'+esc(f.reason)+'</strong> · First '+esc(et(f.first_time))+' · Latest '+esc(et(f.last_time))+' · '+esc(f.occurrences)+' occurrence(s)<br>'+esc(f.hint)+'<br><code>'+esc(f.details)+'</code></p>').join(''):c.blocked===true?'<p>The ledger does not identify a blocking cause for this session. Inspect NinjaScript Output and Control Center Log.</p>':'<p>No blocking-check events were found for this logged session.</p>')+'</div>').join('')||'<p>No native diagnostic records available yet.</p>';
- $('learning').innerHTML=(data.learning_status||[]).filter(s=>account==='all'||!s.account||s.account===account).map(s=>'<p>'+esc(s.account||'Replay')+' · '+(Number(s.direction)>0?'Long':'Short')+' · '+esc(s.observations)+' completed observations · Recent net '+money(Number(s.recent_net_usd))+' · Minimum trend efficiency '+esc(Number(s.min_efficiency).toFixed(2))+' · '+((s.tightened===true||s.tightened==='True')?'Stricter filter active':'Base filter active')+'</p>').join('')||'<p>R1 learns from completed trades. Eight outcomes in a direction are needed before its quality filter can tighten.</p>';
- $('reviews').innerHTML=data.loss_reviews.filter(r=>account==='all'||r.trade.account===account||r.trade.account==null).map((r,i)=>'<details id="loss-'+i+'"><summary>'+esc(r.trade.session)+' · '+esc(r.trade.account||'paper replay')+' · '+money(r.trade.net_usd??r.trade.net_ticks*.5)+' · '+r.diagnostics.length+' questions</summary>'+r.diagnostics.map(q=>'<div class="question"><strong>'+q.number+'. '+esc(q.question)+'</strong> <span class="badge '+(q.status==='flag'?'negative':q.status==='unknown'?'unknown':'')+'">'+esc(q.status)+'</span><div class="answer">'+esc(q.answer)+'</div>'+(q.evidence?'<pre>'+esc(JSON.stringify(q.evidence,null,2))+'</pre>':'')+'</div>').join('')+'<p>R1 records bounded quality-filter changes from completed trades. Broader fixes need separate paper tests and future evidence.</p></details>').join('')||'<p>No recorded losses for this account.</p>';
+ const phases={WAITING_QUOTES:'Waiting for a paired live bid/ask quote',WAITING_R2_BARS:'Building six fresh closed bars after the CME open',PRE_CLOSE:'Pre-close protection; fresh entries paused before CME maintenance',CME_CLOSED:'CME maintenance/weekend/reviewed closure; waiting for the next open',OUTSIDE_RTH:'Outside the 09:30–16:00 ET session; R1 setups start at 10:00 ET',NO_CALENDAR_SESSION:'No reviewed calendar session for this date',WAITING_R1_WINDOW:'Outside the 10:00–15:45 ET R1 setup window',POSITION_OPEN:'Managing an open position',ENTRY_PENDING:'Entry order pending',BLOCKED:'Entries blocked',NEWS_PAUSE:'Scheduled news pause',SCANNING:'Scanning for eligible setups'};
+ $('live').innerHTML=live.map(s=>'<p><strong>'+esc(s.account)+' / '+esc(s.strategy)+'</strong>'+(s.regime?' · '+esc(s.regime):'')+(s.futures_day?' · Futures day '+esc(s.futures_day):'')+' · Price '+esc(s.price)+' · Open contracts '+esc(s.open_qty)+' · Estimated open P&amp;L '+money(Number(s.unrealized_usd))+' · Session realized '+money(Number(s.day_net_usd))+'<br>'+esc(phases[s.phase]||((s.blocked==='True'||s.blocked===true)?'Entries blocked':(s.news_pause==='True'||s.news_pause===true)?'Scheduled news pause':'Scanning for eligible setups'))+' · Latest tick '+esc(et(s.timestamp))+' <span class="tick-age" data-time="'+esc(s.timestamp)+'" data-limit="'+esc(s.max_tick_gap_seconds||90)+'"></span>'+(s.received_at_et?'<br>Delivery lag at logged update: '+esc(s.feed_age_seconds)+'s · Received '+esc(et(s.received_at_et)):'')+'</p>').join('')||'<p>Waiting for live ticks from the strategy. Read the event ledger for initialization and history status. Historical replay has no live connection.</p>';
+ $('entry-checks').innerHTML=(data.entry_checks||[]).filter(c=>account==='all'||c.account===account).map(c=>'<div class="notice"><strong>'+esc(c.account)+' / '+esc(c.strategy)+' · Latest logged session '+esc(c.logged_session)+'</strong>'+(c.feed_timing?'<p>'+esc(c.feed_timing.message)+'</p>':'')+'<p>'+(c.latest_event==='TERMINATED'?'This ledger ends with TERMINATED. Check the currently enabled strategy instance.':c.blocked===true?'The latest logged tick reports entries blocked.':c.blocked===false?'The latest logged tick reports entries unblocked.':'No blocked/unblocked state is available for this logged session.')+'</p>'+(c.strategy==='P0'?'<p>Recorded arm is P0, which uses late-afternoon entries. The requested full-session scanner is R2; select R2 explicitly in NinjaTrader.</p>':'')+((c.recorded_checks||[]).length?'<p>Recorded checks for this session; earlier checks may no longer be active:</p>'+c.recorded_checks.map(f=>'<p><strong>'+esc(f.reason)+'</strong> · First '+esc(et(f.first_time))+' · Latest '+esc(et(f.last_time))+' · '+esc(f.occurrences)+' occurrence(s)<br>'+esc(f.hint)+'<br><code>'+esc(f.details)+'</code></p>').join(''):c.blocked===true?'<p>The ledger does not identify a blocking cause for this session. Inspect NinjaScript Output and Control Center Log.</p>':'<p>No blocking-check events were found for this logged session.</p>')+'</div>').join('')||'<p>No native diagnostic records available yet.</p>';
+ $('learning').innerHTML=(data.learning_status||[]).filter(s=>account==='all'||!s.account||s.account===account).map(s=>'<p>'+esc(s.account||'Replay')+' · '+esc(s.regime||'RTH')+' · '+(Number(s.direction)>0?'Long':'Short')+' · '+esc(s.observations)+' completed observations · Recent net '+money(Number(s.recent_net_usd))+' · Minimum trend efficiency '+esc(Number(s.min_efficiency).toFixed(2))+' · '+((s.tightened===true||s.tightened==='True')?'Stricter filter active':'Base filter active')+'</p>').join('')||'<p>R1/R2 learn from completed trades. R2 keeps daytime and overnight outcomes separate; eight outcomes per direction and profile are needed before a filter can tighten.</p>';
+ $('reviews').innerHTML=data.loss_reviews.filter(r=>account==='all'||r.trade.account===account||r.trade.account==null).map((r,i)=>'<details id="loss-'+i+'"><summary>'+esc(r.trade.session)+' · '+esc(r.trade.account||'paper replay')+' · '+money(r.trade.net_usd??r.trade.net_ticks*.5)+' · '+r.diagnostics.length+' questions</summary>'+r.diagnostics.map(q=>'<div class="question"><strong>'+q.number+'. '+esc(q.question)+'</strong> <span class="badge '+(q.status==='flag'?'negative':q.status==='unknown'?'unknown':'')+'">'+esc(q.status)+'</span><div class="answer">'+esc(q.answer)+'</div>'+(q.evidence?'<pre>'+esc(JSON.stringify(q.evidence,null,2))+'</pre>':'')+'</div>').join('')+'<p>R1/R2 record bounded quality-filter changes from completed trades. Broader fixes need separate paper tests and future evidence.</p></details>').join('')||'<p>No recorded losses for this account.</p>';
  const eventMode=$('event-mode').value;
  try{localStorage.setItem('mnqEventMode',eventMode);}catch(e){}
  const ledger=data.events.filter(e=>account==='all'||!e.account||e.account===account).filter(e=>eventMode==='all'||(eventMode==='live'?e.reason==='LIVE_STATUS':e.reason!=='LIVE_STATUS'));
  $('event-count').textContent='Showing '+Math.min(ledger.length,300)+' of '+ledger.length+' matching events. Diagnostic mode excludes LIVE_STATUS.';
  $('events').innerHTML=ledger.slice(-300).map(e=>'<tr><td>'+esc(e.timestamp)+'</td><td>'+esc(e.reason)+'</td><td>'+esc(e.details||JSON.stringify(e))+'</td></tr>').join('')||'<tr><td colspan="3">No matching events.</td></tr>';
 } $('account').onchange=draw;$('filter').onchange=draw;$('event-mode').onchange=draw;draw();
-function tickAges(){document.querySelectorAll('.tick-age').forEach(e=>{const age=Math.max(0,Math.floor((Date.now()-Date.parse(e.dataset.time))/1000));e.textContent='('+age+'s ago)';e.className='tick-age '+(age>90?'negative':'');});}
+function tickAges(){document.querySelectorAll('.tick-age').forEach(e=>{const age=Math.max(0,Math.floor((Date.now()-Date.parse(e.dataset.time))/1000));e.textContent='('+age+'s ago)';const limit=Number(e.dataset.limit)||90;e.className='tick-age '+(age>limit?'negative':'');});}
 tickAges();setInterval(tickAges,1000);
 try{const saved=JSON.parse(sessionStorage.getItem('mnqUi')||'null');if(saved){saved.open.forEach(id=>{const e=$(id);if(e)e.open=true;});window.scrollTo(0,saved.scroll);}}catch(e){}
 setTimeout(()=>{try{sessionStorage.setItem('mnqUi',JSON.stringify({scroll:window.scrollY,open:[...document.querySelectorAll('details[id][open]')].map(e=>e.id)}));}catch(e){}location.reload();},5000);

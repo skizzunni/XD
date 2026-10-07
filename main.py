@@ -32,7 +32,7 @@ def parser():
     run.add_argument("--ticks", required=True)
     run.add_argument("--calendar", required=True)
     run.add_argument("--out", required=True)
-    run.add_argument("--strategy", choices=["P0", "C1", "R1"])
+    run.add_argument("--strategy", choices=["P0", "C1", "R1", "R2"])
     demo = commands.add_parser(
         "demo", help="Generate synthetic fixtures and run both strategies"
     )
@@ -128,6 +128,7 @@ def main(argv=None):
                 f"# frozen_sha256={checksum(args.calendar)}; synthetic={str(calendar.synthetic).lower()}; source={Path(args.calendar).name}\n"
             )
             writer = csv.writer(f, lineterminator="\n")
+            extended = any(s.globex_open is not None for s in calendar.sessions.values())
             writer.writerow(
                 [
                     "date",
@@ -139,7 +140,7 @@ def main(argv=None):
                     "news_flags",
                     "trade_enabled",
                     "news_windows",
-                ]
+                ] + (["globex_open_et", "globex_close_et", "globex_news_windows", "globex_breaks"] if extended else [])
             )
             for _, session in sorted(calendar.sessions.items()):
                 writer.writerow(
@@ -156,7 +157,12 @@ def main(argv=None):
                             f"{start.strftime('%H:%M:%S')}-{end.strftime('%H:%M:%S')}"
                             for start, end in session.news_windows
                         ),
-                    ]
+                    ] + ([
+                        session.globex_open.isoformat() if session.globex_open else "",
+                        session.globex_close.isoformat() if session.globex_close else "",
+                        "|".join(f"{a.isoformat()}~{b.isoformat()}" for a, b in session.globex_news_windows),
+                        "|".join(f"{a.isoformat()}~{b.isoformat()}" for a, b in session.globex_breaks),
+                    ] if extended else [])
                 )
         print(f"Frozen NinjaTrader calendar written to {output}")
         return 0

@@ -36,14 +36,19 @@ class Config:
     rolling_momentum_threshold: float = 0.05
     rolling_min_efficiency: float = 0.40
     adaptive_quality: bool = True
+    overnight_min_efficiency: float = 0.55
+    overnight_stop_atr: float = 0.10
+    overnight_target_r: float = 1.25
+    overnight_max_hold_minutes: int = 20
+    full_session_max_spread_ticks: int = 2
 
     def __post_init__(self):
         if self.mode != "paper":
             raise ValueError(
                 "Only mode='paper' is implemented; live orders are unavailable"
             )
-        if self.strategy not in {"P0", "C1", "R1"}:
-            raise ValueError("strategy must be P0, C1 or R1")
+        if self.strategy not in {"P0", "C1", "R1", "R2"}:
+            raise ValueError("strategy must be P0, C1, R1 or R2")
         for f in fields(self):
             value = getattr(self, f.name)
             if f.type in {"int", "float", int, float}:
@@ -61,6 +66,12 @@ class Config:
             raise ValueError("costs_calibrated must be a boolean")
         if not isinstance(self.adaptive_quality, bool):
             raise ValueError("adaptive_quality must be a boolean")
+        if (not 0 < self.overnight_min_efficiency <= 0.85
+                or not 0 < self.overnight_stop_atr <= 0.20
+                or not 0 < self.overnight_target_r <= 1.5
+                or not 0 < self.overnight_max_hold_minutes <= 30
+                or not 0 < self.full_session_max_spread_ticks <= 4):
+            raise ValueError("Invalid full-session overnight quality/risk/liquidity parameters")
         if (
             not 0 < self.rolling_min_efficiency <= 0.85
             or self.rolling_momentum_threshold <= 0

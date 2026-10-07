@@ -1,0 +1,2468 @@
+{
+  "version": 1,
+  "source": "Official NYSE core-session policy, CME customary roll dates, BLS/BEA/Federal Reserve Board schedules; fixed MNQ December 2026 Sim101 snapshot; official dated CME MNQ Globex hours and contract specification",
+  "synthetic": false,
+  "news_as_of": "2026-10-07T09:33:16+00:00",
+  "purpose": "R2 full-session Sim101 paper experiment for futures trading dates October 7-30, 2026. Earlier rows are cash ATR20 warmup only. Review/refresh later dates before trading.",
+  "contract_policy": "MNQ 12-26 throughout, including pre-roll warmup. Use actual individual December-contract history; do not substitute September or back-adjusted continuous prices. This is not a front-month research series.",
+  "session_policy": "09:30-16:00 America/New_York core cash session. NYSE Labor Day 2026-09-07 excluded. No scheduled early closes in this window. CME customary US-index roll 2026-09-14 marked and not tradable.",
+  "news_coverage": "All timed entries in the cited BLS, BEA and Federal Reserve Board monthly schedules for included dates. Includes CPI, payrolls, GDP, FOMC decisions/press conferences, Board speeches and statistical releases. No claim of an exhaustive all-provider, all-speaker news feed or unscheduled-event coverage.",
+  "revision_policy": "Retained official schedules are frozen snapshots, not a live news service. Historical warmup hours were reviewed retrospectively; forward R2 begins only after installation. Release revision markers are unknown (null). Preserve the snapshot and refresh schedules before later trading dates; do not treat it as point-in-time research data.",
+  "sources": [
+    {
+      "id": "nyse-hours",
+      "url": "https://www.nyse.com/markets/hours-calendars",
+      "retrieved_at": "2026-10-07T09:33:16+00:00",
+      "sha256": "79602f7be5a8f1d39c2b1cac4dd02c4c07f18cf9f92d70602834069154719bad"
+    },
+    {
+      "id": "cme-rolls",
+      "url": "https://www.cmegroup.com/trading/equity-index/rolldates.html",
+      "retrieved_at": "2026-10-07T09:33:16+00:00",
+      "sha256": "b8dadf35dcef05a0772412ebdda2edef38f90872311b128a6e62312c760b773c"
+    },
+    {
+      "id": "fomc-calendar",
+      "url": "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm",
+      "retrieved_at": "2026-10-07T09:33:16+00:00",
+      "sha256": "fd48fce31297eebff0fe214de9c3f9901dbff0e87d0fa4e57f657a4a2929ca15"
+    },
+    {
+      "id": "bls-august",
+      "url": "https://www.bls.gov/schedule/2026/08_sched.htm",
+      "retrieved_at": "2026-10-07T09:33:16+00:00",
+      "sha256": "95c7440fb4b9f4615611e0f17d0c62986804bfd2b323fd9137ca77f948447286"
+    },
+    {
+      "id": "bls-september",
+      "url": "https://www.bls.gov/schedule/2026/09_sched.htm",
+      "retrieved_at": "2026-10-07T09:33:16+00:00",
+      "sha256": "c518a1be8cf19e9626a0c5bf33ef2d2d4c0765b22360319e7ac0f5265c8b2151"
+    },
+    {
+      "id": "bls-october",
+      "url": "https://www.bls.gov/schedule/2026/10_sched.htm",
+      "retrieved_at": "2026-10-07T09:33:16+00:00",
+      "sha256": "dfb96e2ba556d1b473f5b2ee5f5f4d1e4c8db2f330e2388e80b97656b871f1e0"
+    },
+    {
+      "id": "bea-full",
+      "url": "https://www.bea.gov/news/schedule/full",
+      "retrieved_at": "2026-10-07T09:33:16+00:00",
+      "sha256": "bb9e0b03e9c40e0d85fbf4f3b7d595199362eb57e17426dbf58fa1c0602fe5b6"
+    },
+    {
+      "id": "fed-august",
+      "url": "https://www.federalreserve.gov/newsevents/2026-august.htm",
+      "retrieved_at": "2026-10-07T09:33:16+00:00",
+      "sha256": "92713765d0c29f938ea5e8916b35c5d2d8987d285188c80a4721ed36db5dc8b3"
+    },
+    {
+      "id": "fed-september",
+      "url": "https://www.federalreserve.gov/newsevents/2026-september.htm",
+      "retrieved_at": "2026-10-07T09:33:16+00:00",
+      "sha256": "e79284396add828a77770dce7209d33eb78c285a17382ff38bf4ed000ea8084d"
+    },
+    {
+      "id": "fed-october",
+      "url": "https://www.federalreserve.gov/newsevents/2026-october.htm",
+      "retrieved_at": "2026-10-07T09:33:16+00:00",
+      "sha256": "2776e836fd8f0db7cfe96eff34be1c1c775d3e36dd5a117643c3ca3468748c07"
+    },
+    {
+      "id": "cme-mnq-dated-hours-2026-08-23-10-30.json",
+      "url": "https://www.cmegroup.com/services/trading-hours-by-product?pageNumber=1&pageSize=100&exch=CME&cleared=Futures&searchString=Micro%20E-mini%20Nasdaq&fromEventDate=2026-08-23&toEventDate=2026-10-30",
+      "retrieved_at": "2026-10-07T19:10:50.391807+00:00",
+      "sha256": "b0ebf816ca352beb391d50e14f8be1cf918775b852722538151a03181580f728"
+    },
+    {
+      "id": "cme-mnq-contract-spec.json",
+      "url": "https://www.cmegroup.com/CmeWS/mvc/ContractSpecs/List/productId/8668",
+      "retrieved_at": "2026-10-07T19:10:50.391807+00:00",
+      "sha256": "55cfc052656cc0175d42ea314f03fd9edbde26fc95db1c90eec9117adc57666f"
+    }
+  ],
+  "untimed_events": [
+    {
+      "date": "2026-08-31",
+      "name": "G.20 - Finance Companies",
+      "source_id": "fed-august",
+      "note": "No exact time supplied by source; warmup only."
+    },
+    {
+      "date": "2026-09-30",
+      "name": "G.20 - Finance Companies",
+      "source_id": "fed-september",
+      "note": "No exact time supplied by source; warmup only."
+    }
+  ],
+  "sessions": [
+    {
+      "date": "2026-08-24",
+      "open": "2026-08-24T09:30:00-04:00",
+      "close": "2026-08-24T16:00:00-04:00",
+      "contract": "MNQ 12-26",
+      "roll_day": false,
+      "trade_enabled": false,
+      "news": {
+        "flags": [
+          "FED_RELEASE",
+          "fed-august"
+        ],
+        "releases": [
+          {
+            "name": "CP - Commercial Paper",
+            "timestamp": "2026-08-24T13:00:00-04:00",
+            "revision": null,
+            "source_id": "fed-august"
+          },
+          {
+            "name": "H.10 - Foreign Exchange Rates",
+            "timestamp": "2026-08-24T16:15:00-04:00",
+            "revision": null,
+            "source_id": "fed-august"
+          },
+          {
+            "name": "H.15 - Selected Interest Rates",
+            "timestamp": "2026-08-24T16:15:00-04:00",
+            "revision": null,
+            "source_id": "fed-august"
+          }
+        ]
+      },
+      "globex": {
+        "open": "2026-08-23T18:00:00-04:00",
+        "close": "2026-08-24T17:00:00-04:00",
+        "breaks": []
+      }
+    },
+    {
+      "date": "2026-08-25",
+      "open": "2026-08-25T09:30:00-04:00",
+      "close": "2026-08-25T16:00:00-04:00",
+      "contract": "MNQ 12-26",
+      "roll_day": false,
+      "trade_enabled": false,
+      "news": {
+        "flags": [
+          "FED_RELEASE",
+          "fed-august"
+        ],
+        "releases": [
+          {
+            "name": "CP - Commercial Paper",
+            "timestamp": "2026-08-25T13:00:00-04:00",
+            "revision": null,
+            "source_id": "fed-august"
+          },
+          {
+            "name": "H.6 - Money Stock Measures",
+            "timestamp": "2026-08-25T13:00:00-04:00",
+            "revision": null,
+            "source_id": "fed-august"
+          },
+          {
+            "name": "H.15 - Selected Interest Rates",
+            "timestamp": "2026-08-25T16:15:00-04:00",
+            "revision": null,
+            "source_id": "fed-august"
+          }
+        ]
+      },
+      "globex": {
+        "open": "2026-08-24T18:00:00-04:00",
+        "close": "2026-08-25T17:00:00-04:00",
+        "breaks": []
+      }
+    },
+    {
+      "date": "2026-08-26",
+      "open": "2026-08-26T09:30:00-04:00",
+      "close": "2026-08-26T16:00:00-04:00",
+      "contract": "MNQ 12-26",
+      "roll_day": false,
+      "trade_enabled": false,
+      "news": {
+        "flags": [
+          "BLS_RELEASE",
+          "FED_RELEASE",
+          "GDP",
+          "PCE",
+          "bea-full",
+          "bls-august",
+          "fed-august"
+        ],
+        "releases": [
+          {
+            "name": "GDP (Second Estimate) and Corporate Profits, 2nd Quarter 2026",
+            "timestamp": "2026-08-26T08:30:00-04:00",
+            "revision": null,
+            "source_id": "bea-full"
+          },
+          {
+            "name": "Personal Income and Outlays, July 2026",
+            "timestamp": "2026-08-26T08:30:00-04:00",
+            "revision": null,
+            "source_id": "bea-full"
+          },
+          {
+            "name": "Access to and Use of Leave",
+            "timestamp": "2026-08-26T10:00:00-04:00",
+            "revision": null,
+            "source_id": "bls-august"
+          },
+          {
+            "name": "Productivity and Costs by Industry: Selected Service-Providing Industries",
+            "timestamp": "2026-08-26T10:00:00-04:00",
+            "revision": null,
+            "source_id": "bls-august"
+          },
+          {
+            "name": "CP - Commercial Paper",
+            "timestamp": "2026-08-26T13:00:00-04:00",
+            "revision": null,
+            "source_id": "fed-august"
+          },
+          {
+            "name": "H.15 - Selected Interest Rates",
+            "timestamp": "2026-08-26T16:15:00-04:00",
+            "revision": null,
+            "source_id": "fed-august"
+          }
+        ]
+      },
+      "globex": {
+        "open": "2026-08-25T18:00:00-04:00",
+        "close": "2026-08-26T17:00:00-04:00",
+        "breaks": []
+      }
+    },
+    {
+      "date": "2026-08-27",
+      "open": "2026-08-27T09:30:00-04:00",
+      "close": "2026-08-27T16:00:00-04:00",
+      "contract": "MNQ 12-26",
+      "roll_day": false,
+      "trade_enabled": false,
+      "news": {
+        "flags": [
+          "BLS_RELEASE",
+          "FED_RELEASE",
+          "bls-august",
+          "fed-august"
+        ],
+        "releases": [
+          {
+            "name": "Employment Projections and Occupational Outlook Handbook",
+            "timestamp": "2026-08-27T10:00:00-04:00",
+            "revision": null,
+            "source_id": "bls-august"
+          },
+          {
+            "name": "Worker Displacement",
+            "timestamp": "2026-08-27T10:00:00-04:00",
+            "revision": null,
+            "source_id": "bls-august"
+          },
+          {
+            "name": "CP - Commercial Paper",
+            "timestamp": "2026-08-27T13:00:00-04:00",
+            "revision": null,
+            "source_id": "fed-august"
+          },
+          {
+            "name": "H.15 - Selected Interest Rates",
+            "timestamp": "2026-08-27T16:15:00-04:00",
+            "revision": null,
+            "source_id": "fed-august"
+          },
+          {
+            "name": "H.4.1 - Factors Affecting Reserve Balances",
+            "timestamp": "2026-08-27T16:30:00-04:00",
+            "revision": null,
+            "source_id": "fed-august"
+          }
+        ]
+      },
+      "globex": {
+        "open": "2026-08-26T18:00:00-04:00",
+        "close": "2026-08-27T17:00:00-04:00",
+        "breaks": []
+      }
+    },
+    {
+      "date": "2026-08-28",
+      "open": "2026-08-28T09:30:00-04:00",
+      "close": "2026-08-28T16:00:00-04:00",
+      "contract": "MNQ 12-26",
+      "roll_day": false,
+      "trade_enabled": false,
+      "news": {
+        "flags": [
+          "BLS_RELEASE",
+          "FED_RELEASE",
+          "FED_SPEECH",
+          "bls-august",
+          "fed-august"
+        ],
+        "releases": [
+          {
+            "name": "County Employment and Wages",
+            "timestamp": "2026-08-28T10:00:00-04:00",
+            "revision": null,
+            "source_id": "bls-august"
+          },
+          {
+            "name": "Current Employment Statistics Preliminary Benchmark (National)",
+            "timestamp": "2026-08-28T10:00:00-04:00",
+            "revision": null,
+            "source_id": "bls-august"
+          },
+          {
+            "name": "Current Employment Statistics Preliminary Benchmark (State and Area)",
+            "timestamp": "2026-08-28T10:00:00-04:00",
+            "revision": null,
+            "source_id": "bls-august"
+          },
+          {
+            "name": "Speech - Chairman Kevin Warsh: Keynote Remarks",
+            "timestamp": "2026-08-28T10:00:00-04:00",
+            "revision": null,
+            "source_id": "fed-august"
+          },
+          {
+            "name": "CP - Commercial Paper",
+            "timestamp": "2026-08-28T13:00:00-04:00",
+            "revision": null,
+            "source_id": "fed-august"
+          },
+          {
+            "name": "H.15 - Selected Interest Rates",
+            "timestamp": "2026-08-28T16:15:00-04:00",
+            "revision": null,
+            "source_id": "fed-august"
+          },
+          {
+            "name": "H.8 - Assets and Liabilities of Commercial Banks in the U.S.",
+            "timestamp": "2026-08-28T16:15:00-04:00",
+            "revision": null,
+            "source_id": "fed-august"
+          }
+        ]
+      },
+      "globex": {
+        "open": "2026-08-27T18:00:00-04:00",
+        "close": "2026-08-28T17:00:00-04:00",
+        "breaks": []
+      }
+    },
+    {
+      "date": "2026-08-31",
+      "open": "2026-08-31T09:30:00-04:00",
+      "close": "2026-08-31T16:00:00-04:00",
+      "contract": "MNQ 12-26",
+      "roll_day": false,
+      "trade_enabled": false,
+      "news": {
+        "flags": [
+          "FED_RELEASE",
+          "FED_UNTIMED",
+          "fed-august"
+        ],
+        "releases": [
+          {
+            "name": "CP - Commercial Paper",
+            "timestamp": "2026-08-31T13:00:00-04:00",
+            "revision": null,
+            "source_id": "fed-august"
+          },
+          {
+            "name": "H.10 - Foreign Exchange Rates",
+            "timestamp": "2026-08-31T16:15:00-04:00",
+            "revision": null,
+            "source_id": "fed-august"
+          },
+          {
+            "name": "H.15 - Selected Interest Rates",
+            "timestamp": "2026-08-31T16:15:00-04:00",
+            "revision": null,
+            "source_id": "fed-august"
+          }
+        ]
+      },
+      "globex": {
+        "open": "2026-08-30T18:00:00-04:00",
+        "close": "2026-08-31T17:00:00-04:00",
+        "breaks": []
+      }
+    },
+    {
+      "date": "2026-09-01",
+      "open": "2026-09-01T09:30:00-04:00",
+      "close": "2026-09-01T16:00:00-04:00",
+      "contract": "MNQ 12-26",
+      "roll_day": false,
+      "trade_enabled": false,
+      "news": {
+        "flags": [
+          "BLS_RELEASE",
+          "FED_RELEASE",
+          "FED_SPEECH",
+          "bls-september",
+          "fed-september"
+        ],
+        "releases": [
+          {
+            "name": "Speech - Governor Michael S. Barr: Economic Outlook and Financial Inclusion",
+            "timestamp": "2026-09-01T09:05:00-04:00",
+            "revision": null,
+            "source_id": "fed-september"
+          },
+          {
+            "name": "Job Openings and Labor Turnover Survey",
+            "timestamp": "2026-09-01T10:00:00-04:00",
+            "revision": null,
+            "source_id": "bls-september"
+          },
+          {
+            "name": "CP - Commercial Paper",
+            "timestamp": "2026-09-01T13:00:00-04:00",
+            "revision": null,
+            "source_id": "fed-september"
+          },
+          {
+            "name": "G.5 - Foreign Exchange Rates",
+            "timestamp": "2026-09-01T16:15:00-04:00",
+            "revision": null,
+            "source_id": "fed-september"
+          },
+          {
+            "name": "H.15 - Selected Interest Rates",
+            "timestamp": "2026-09-01T16:15:00-04:00",
+            "revision": null,
+            "source_id": "fed-september"
+          }
+        ]
+      },
+      "globex": {
+        "open": "2026-08-31T18:00:00-04:00",
+        "close": "2026-09-01T17:00:00-04:00",
+        "breaks": []
+      }
+    },
+    {
+      "date": "2026-09-02",
+      "open": "2026-09-02T09:30:00-04:00",
+      "close": "2026-09-02T16:00:00-04:00",
+      "contract": "MNQ 12-26",
+      "roll_day": false,
+      "trade_enabled": false,
+      "news": {
+        "flags": [
+          "BLS_RELEASE",
+          "FED_RELEASE",
+          "bls-september",
+          "fed-september"
+        ],
+        "releases": [
+          {
+            "name": "Metropolitan Area Employment and Unemployment (Monthly)",
+            "timestamp": "2026-09-02T10:00:00-04:00",
+            "revision": null,
+            "source_id": "bls-september"
+          },
+          {
+            "name": "CP - Commercial Paper",
+            "timestamp": "2026-09-02T13:00:00-04:00",
+            "revision": null,
+            "source_id": "fed-september"
+          },
+          {
+            "name": "Beige Book",
+            "timestamp": "2026-09-02T14:00:00-04:00",
+            "revision": null,
+            "source_id": "fed-september"
+          },
+          {
+            "name": "H.15 - Selected Interest Rates",
+            "timestamp": "2026-09-02T16:15:00-04:00",
+            "revision": null,
+            "source_id": "fed-september"
+          }
+        ]
+      },
+      "globex": {
+        "open": "2026-09-01T18:00:00-04:00",
+        "close": "2026-09-02T17:00:00-04:00",
+        "breaks": []
+      }
+    },
+    {
+      "date": "2026-09-03",
+      "open": "2026-09-03T09:30:00-04:00",
+      "close": "2026-09-03T16:00:00-04:00",
+      "contract": "MNQ 12-26",
+      "roll_day": false,
+      "trade_enabled": false,
+      "news": {
+        "flags": [
+          "BEA_RELEASE",
+          "BLS_RELEASE",
+          "FED_RELEASE",
+          "FED_SPEECH",
+          "bea-full",
+          "bls-september",
+          "fed-september"
+        ],
+        "releases": [
+          {
+            "name": "Productivity and Costs (R)",
+            "timestamp": "2026-09-03T08:30:00-04:00",
+            "revision": null,
+            "source_id": "bls-september"
+          },
+          {
+            "name": "Speech - Governor Christopher J. Waller: Economic Outlook",
+            "timestamp": "2026-09-03T08:30:00-04:00",
+            "revision": null,
+            "source_id": "fed-september"
+          },
+          {
+            "name": "U.S. International Trade in Goods and Services, July 2026",
+            "timestamp": "2026-09-03T08:30:00-04:00",
+            "revision": null,
+            "source_id": "bea-full"
+          },
+          {
+            "name": "CP - Commercial Paper",
+            "timestamp": "2026-09-03T13:00:00-04:00",
+            "revision": null,
+            "source_id": "fed-september"
+          },
+          {
+            "name": "H.15 - Selected Interest Rates",
+            "timestamp": "2026-09-03T16:15:00-04:00",
+            "revision": null,
+            "source_id": "fed-september"
+          },
+          {
+            "name": "H.4.1 - Factors Affecting Reserve Balances",
+            "timestamp": "2026-09-03T16:30:00-04:00",
+            "revision": null,
+            "source_id": "fed-september"
+          }
+        ]
+      },
+      "globex": {
+        "open": "2026-09-02T18:00:00-04:00",
+        "close": "2026-09-03T17:00:00-04:00",
+        "breaks": []
+      }
+    },
+    {
+      "date": "2026-09-04",
+      "open": "2026-09-04T09:30:00-04:00",
+      "close": "2026-09-04T16:00:00-04:00",
+      "contract": "MNQ 12-26",
+      "roll_day": false,
+      "trade_enabled": false,
+      "news": {
+        "flags": [
+          "FED_RELEASE",
+          "PAYROLLS",
+          "bls-september",
+          "fed-september"
+        ],
+        "releases": [
+          {
+            "name": "Employment Situation",
+            "timestamp": "2026-09-04T08:30:00-04:00",
+            "revision": null,
+            "source_id": "bls-september"
+          },
+          {
+            "name": "CP - Commercial Paper",
+            "timestamp": "2026-09-04T13:00:00-04:00",
+            "revision": null,
+            "source_id": "fed-september"
+          },
+          {
+            "name": "H.15 - Selected Interest Rates",
+            "timestamp": "2026-09-04T16:15:00-04:00",
+            "revision": null,
+            "source_id": "fed-september"
+          },
+          {
+            "name": "H.8 - Assets and Liabilities of Commercial Banks in the U.S.",
+            "timestamp": "2026-09-04T16:15:00-04:00",
+            "revision": null,
+            "source_id": "fed-september"
+          }
+        ]
+      },
+      "globex": {
+        "open": "2026-09-03T18:00:00-04:00",
+        "close": "2026-09-04T17:00:00-04:00",
+        "breaks": []
+      }
+    },
+    {
+      "date": "2026-09-08",
+      "open": "2026-09-08T09:30:00-04:00",
+      "close": "2026-09-08T16:00:00-04:00",
+      "contract": "MNQ 12-26",
+      "roll_day": false,
+      "trade_enabled": false,
+      "news": {
+        "flags": [
+          "FED_RELEASE",
+          "fed-september"
+        ],
+        "releases": [
+          {
+            "name": "CP - Commercial Paper",
+            "timestamp": "2026-09-08T13:00:00-04:00",
+            "revision": null,
+            "source_id": "fed-september"
+          },
+          {
+            "name": "G.19 - Consumer Credit",
+            "timestamp": "2026-09-08T15:00:00-04:00",
+            "revision": null,
+            "source_id": "fed-september"
+          },
+          {
+            "name": "H.10 - Foreign Exchange Rates",
+            "timestamp": "2026-09-08T16:15:00-04:00",
+            "revision": null,
+            "source_id": "fed-september"
+          },
+          {
+            "name": "H.15 - Selected Interest Rates",
+            "timestamp": "2026-09-08T16:15:00-04:00",
+            "revision": null,
+            "source_id": "fed-september"
+          }
+        ]
+      },
+      "globex": {
+        "open": "2026-09-07T18:00:00-04:00",
+        "close": "2026-09-08T17:00:00-04:00",
+        "breaks": []
+      }
+    },
+    {
+      "date": "2026-09-09",
+      "open": "2026-09-09T09:30:00-04:00",
+      "close": "2026-09-09T16:00:00-04:00",
+      "contract": "MNQ 12-26",
+      "roll_day": false,
+      "trade_enabled": false,
+      "news": {
+        "flags": [
+          "BLS_RELEASE",
+          "FED_RELEASE",
+          "bls-september",
+          "fed-september"
+        ],
+        "releases": [
+          {
+            "name": "Employer Costs for Employee Compensation",
+            "timestamp": "2026-09-09T10:00:00-04:00",
+            "revision": null,
+            "source_id": "bls-september"
+          },
+          {
+            "name": "CP - Commercial Paper",
+            "timestamp": "2026-09-09T13:00:00-04:00",
+            "revision": null,
+            "source_id": "fed-september"
+          },
+          {
+            "name": "H.15 - Selected Interest Rates",
+            "timestamp": "2026-09-09T16:15:00-04:00",
+            "revision": null,
+            "source_id": "fed-september"
+          }
+        ]
+      },
+      "globex": {
+        "open": "2026-09-08T18:00:00-04:00",
+        "close": "2026-09-09T17:00:00-04:00",
+        "breaks": []
+      }
+    },
+    {
+      "date": "2026-09-10",
+      "open": "2026-09-10T09:30:00-04:00",
+      "close": "2026-09-10T16:00:00-04:00",
+      "contract": "MNQ 12-26",
+      "roll_day": false,
+      "trade_enabled": false,
+      "news": {
+        "flags": [
+          "BLS_RELEASE",
+          "FED_RELEASE",
+          "bls-september",
+          "fed-september"
+        ],
+        "releases": [
+          {
+            "name": "Producer Price Index",
+            "timestamp": "2026-09-10T08:30:00-04:00",
+            "revision": null,
+            "source_id": "bls-september"
+          },
+          {
+            "name": "CP - Commercial Paper",
+            "timestamp": "2026-09-10T13:00:00-04:00",
+            "revision": null,
+            "source_id": "fed-september"
+          },
+          {
+            "name": "H.15 - Selected Interest Rates",
+            "timestamp": "2026-09-10T16:15:00-04:00",
+            "revision": null,
+            "source_id": "fed-september"
+          },
+          {
+            "name": "H.4.1 - Factors Affecting Reserve Balances",
+            "timestamp": "2026-09-10T16:30:00-04:00",
+            "revision": null,
+            "source_id": "fed-september"
+          }
+        ]
+      },
+      "globex": {
+        "open": "2026-09-09T18:00:00-04:00",
+        "close": "2026-09-10T17:00:00-04:00",
+        "breaks": []
+      }
+    },
+    {
+      "date": "2026-09-11",
+      "open": "2026-09-11T09:30:00-04:00",
+      "close": "2026-09-11T16:00:00-04:00",
+      "contract": "MNQ 12-26",
+      "roll_day": false,
+      "trade_enabled": false,
+      "news": {
+        "flags": [
+          "BLS_RELEASE",
+          "CPI",
+          "FED_RELEASE",
+          "bls-september",
+          "fed-september"
+        ],
+        "releases": [
+          {
+            "name": "Consumer Price Index",
+            "timestamp": "2026-09-11T08:30:00-04:00",
+            "revision": null,
+            "source_id": "bls-september"
+          },
+          {
+            "name": "Real Earnings",
+            "timestamp": "2026-09-11T08:30:00-04:00",
+            "revision": null,
+            "source_id": "bls-september"
+          },
+          {
+            "name": "Z.1 - Financial Accounts of the United States",
+            "timestamp": "2026-09-11T12:00:00-04:00",
+            "revision": null,
+            "source_id": "fed-september"
+          },
+          {
+            "name": "CP - Commercial Paper",
+            "timestamp": "2026-09-11T13:00:00-04:00",
+            "revision": null,
+            "source_id": "fed-september"
+          },
+          {
+            "name": "H.15 - Selected Interest Rates",
+            "timestamp": "2026-09-11T16:15:00-04:00",
+            "revision": null,
+            "source_id": "fed-september"
+          },
+          {
+            "name": "H.8 - Assets and Liabilities of Commercial Banks in the U.S.",
+            "timestamp": "2026-09-11T16:15:00-04:00",
+            "revision": null,
+            "source_id": "fed-september"
+          }
+        ]
+      },
+      "globex": {
+        "open": "2026-09-10T18:00:00-04:00",
+        "close": "2026-09-11T17:00:00-04:00",
+        "breaks": []
+      }
+    },
+    {
+      "date": "2026-09-14",
+      "open": "2026-09-14T09:30:00-04:00",
+      "close": "2026-09-14T16:00:00-04:00",
+      "contract": "MNQ 12-26",
+      "roll_day": true,
+      "trade_enabled": false,
+      "news": {
+        "flags": [
+          "FED_RELEASE",
+          "fed-september"
+        ],
+        "releases": [
+          {
+            "name": "CP - Commercial Paper",
+            "timestamp": "2026-09-14T13:00:00-04:00",
+            "revision": null,
+            "source_id": "fed-september"
+          },
+          {
+            "name": "H.10 - Foreign Exchange Rates",
+            "timestamp": "2026-09-14T16:15:00-04:00",
+            "revision": null,
+            "source_id": "fed-september"
+          },
+          {
+            "name": "H.15 - Selected Interest Rates",
+            "timestamp": "2026-09-14T16:15:00-04:00",
+            "revision": null,
+            "source_id": "fed-september"
+          }
+        ]
+      },
+      "globex": {
+        "open": "2026-09-13T18:00:00-04:00",
+        "close": "2026-09-14T17:00:00-04:00",
+        "breaks": []
+      }
+    },
+    {
+      "date": "2026-09-15",
+      "open": "2026-09-15T09:30:00-04:00",
+      "close": "2026-09-15T16:00:00-04:00",
+      "contract": "MNQ 12-26",
+      "roll_day": false,
+      "trade_enabled": false,
+      "news": {
+        "flags": [
+          "FED_RELEASE",
+          "FOMC_MEETING_DAY_1",
+          "fed-september"
+        ],
+        "releases": [
+          {
+            "name": "CP - Commercial Paper",
+            "timestamp": "2026-09-15T13:00:00-04:00",
+            "revision": null,
+            "source_id": "fed-september"
+          },
+          {
+            "name": "H.15 - Selected Interest Rates",
+            "timestamp": "2026-09-15T16:15:00-04:00",
+            "revision": null,
+            "source_id": "fed-september"
+          }
+        ]
+      },
+      "globex": {
+        "open": "2026-09-14T18:00:00-04:00",
+        "close": "2026-09-15T17:00:00-04:00",
+        "breaks": []
+      }
+    },
+    {
+      "date": "2026-09-16",
+      "open": "2026-09-16T09:30:00-04:00",
+      "close": "2026-09-16T16:00:00-04:00",
+      "contract": "MNQ 12-26",
+      "roll_day": false,
+      "trade_enabled": false,
+      "news": {
+        "flags": [
+          "BLS_RELEASE",
+          "FED_RELEASE",
+          "FOMC",
+          "bls-september",
+          "fed-september"
+        ],
+        "releases": [
+          {
+            "name": "U.S. Import and Export Price Indexes",
+            "timestamp": "2026-09-16T08:30:00-04:00",
+            "revision": null,
+            "source_id": "bls-september"
+          },
+          {
+            "name": "CP - Commercial Paper",
+            "timestamp": "2026-09-16T13:00:00-04:00",
+            "revision": null,
+            "source_id": "fed-september"
+          },
+          {
+            "name": "FOMC Meeting",
+            "timestamp": "2026-09-16T14:00:00-04:00",
+            "revision": null,
+            "source_id": "fed-september"
+          },
+          {
+            "name": "FOMC Press Conference",
+            "timestamp": "2026-09-16T14:30:00-04:00",
+            "revision": null,
+            "source_id": "fed-september"
+          },
+          {
+            "name": "H.15 - Selected Interest Rates",
+            "timestamp": "2026-09-16T16:15:00-04:00",
+            "revision": null,
+            "source_id": "fed-september"
+          }
+        ]
+      },
+      "globex": {
+        "open": "2026-09-15T18:00:00-04:00",
+        "close": "2026-09-16T17:00:00-04:00",
+        "breaks": []
+      }
+    },
+    {
+      "date": "2026-09-17",
+      "open": "2026-09-17T09:30:00-04:00",
+      "close": "2026-09-17T16:00:00-04:00",
+      "contract": "MNQ 12-26",
+      "roll_day": false,
+      "trade_enabled": false,
+      "news": {
+        "flags": [
+          "FED_RELEASE",
+          "fed-september"
+        ],
+        "releases": [
+          {
+            "name": "CP - Commercial Paper",
+            "timestamp": "2026-09-17T13:00:00-04:00",
+            "revision": null,
+            "source_id": "fed-september"
+          },
+          {
+            "name": "H.15 - Selected Interest Rates",
+            "timestamp": "2026-09-17T16:15:00-04:00",
+            "revision": null,
+            "source_id": "fed-september"
+          },
+          {
+            "name": "H.4.1 - Factors Affecting Reserve Balances",
+            "timestamp": "2026-09-17T16:30:00-04:00",
+            "revision": null,
+            "source_id": "fed-september"
+          }
+        ]
+      },
+      "globex": {
+        "open": "2026-09-16T18:00:00-04:00",
+        "close": "2026-09-17T17:00:00-04:00",
+        "breaks": []
+      }
+    },
+    {
+      "date": "2026-09-18",
+      "open": "2026-09-18T09:30:00-04:00",
+      "close": "2026-09-18T16:00:00-04:00",
+      "contract": "MNQ 12-26",
+      "roll_day": false,
+      "trade_enabled": false,
+      "news": {
+        "flags": [
+          "BLS_RELEASE",
+          "FED_RELEASE",
+          "FED_SPEECH",
+          "bls-september",
+          "fed-september"
+        ],
+        "releases": [
+          {
+            "name": "G.17 - Industrial Production and Capacity Utilization",
+            "timestamp": "2026-09-18T09:15:00-04:00",
+            "revision": null,
+            "source_id": "fed-september"
+          },
+          {
+            "name": "Speech - Vice Chair for Supervision Michelle W. Bowman: Stress Testing",
+            "timestamp": "2026-09-18T09:30:00-04:00",
+            "revision": null,
+            "source_id": "fed-september"
+          },
+          {
+            "name": "State Employment and Unemployment (Monthly)",
+            "timestamp": "2026-09-18T10:00:00-04:00",
+            "revision": null,
+            "source_id": "bls-september"
+          },
+          {
+            "name": "CP - Commercial Paper",
+            "timestamp": "2026-09-18T13:00:00-04:00",
+            "revision": null,
+            "source_id": "fed-september"
+          },
+          {
+            "name": "H.15 - Selected Interest Rates",
+            "timestamp": "2026-09-18T16:15:00-04:00",
+            "revision": null,
+            "source_id": "fed-september"
+          },
+          {
+            "name": "H.8 - Assets and Liabilities of Commercial Banks in the U.S.",
+            "timestamp": "2026-09-18T16:15:00-04:00",
+            "revision": null,
+            "source_id": "fed-september"
+          }
+        ]
+      },
+      "globex": {
+        "open": "2026-09-17T18:00:00-04:00",
+        "close": "2026-09-18T17:00:00-04:00",
+        "breaks": []
+      }
+    },
+    {
+      "date": "2026-09-21",
+      "open": "2026-09-21T09:30:00-04:00",
+      "close": "2026-09-21T16:00:00-04:00",
+      "contract": "MNQ 12-26",
+      "roll_day": false,
+      "trade_enabled": false,
+      "news": {
+        "flags": [
+          "FED_RELEASE",
+          "fed-september"
+        ],
+        "releases": [
+          {
+            "name": "CP - Commercial Paper",
+            "timestamp": "2026-09-21T13:00:00-04:00",
+            "revision": null,
+            "source_id": "fed-september"
+          },
+          {
+            "name": "H.10 - Foreign Exchange Rates",
+            "timestamp": "2026-09-21T16:15:00-04:00",
+            "revision": null,
+            "source_id": "fed-september"
+          },
+          {
+            "name": "H.15 - Selected Interest Rates",
+            "timestamp": "2026-09-21T16:15:00-04:00",
+            "revision": null,
+            "source_id": "fed-september"
+          }
+        ]
+      },
+      "globex": {
+        "open": "2026-09-20T18:00:00-04:00",
+        "close": "2026-09-21T17:00:00-04:00",
+        "breaks": []
+      }
+    },
+    {
+      "date": "2026-09-22",
+      "open": "2026-09-22T09:30:00-04:00",
+      "close": "2026-09-22T16:00:00-04:00",
+      "contract": "MNQ 12-26",
+      "roll_day": false,
+      "trade_enabled": false,
+      "news": {
+        "flags": [
+          "FED_RELEASE",
+          "FED_SPEECH",
+          "fed-september"
+        ],
+        "releases": [
+          {
+            "name": "Speech - Vice Chair Philip N. Jefferson: Discount Window Modernization and Treasury Market Functioning",
+            "timestamp": "2026-09-22T10:20:00-04:00",
+            "revision": null,
+            "source_id": "fed-september"
+          },
+          {
+            "name": "CP - Commercial Paper",
+            "timestamp": "2026-09-22T13:00:00-04:00",
+            "revision": null,
+            "source_id": "fed-september"
+          },
+          {
+            "name": "H.6 - Money Stock Measures",
+            "timestamp": "2026-09-22T13:00:00-04:00",
+            "revision": null,
+            "source_id": "fed-september"
+          },
+          {
+            "name": "H.15 - Selected Interest Rates",
+            "timestamp": "2026-09-22T16:15:00-04:00",
+            "revision": null,
+            "source_id": "fed-september"
+          }
+        ]
+      },
+      "globex": {
+        "open": "2026-09-21T18:00:00-04:00",
+        "close": "2026-09-22T17:00:00-04:00",
+        "breaks": []
+      }
+    },
+    {
+      "date": "2026-09-23",
+      "open": "2026-09-23T09:30:00-04:00",
+      "close": "2026-09-23T16:00:00-04:00",
+      "contract": "MNQ 12-26",
+      "roll_day": false,
+      "trade_enabled": false,
+      "news": {
+        "flags": [
+          "FED_RELEASE",
+          "FED_SPEECH",
+          "fed-september"
+        ],
+        "releases": [
+          {
+            "name": "Speech - Governor Michael S. Barr: Economic Outlook and Housing",
+            "timestamp": "2026-09-23T10:05:00-04:00",
+            "revision": null,
+            "source_id": "fed-september"
+          },
+          {
+            "name": "CP - Commercial Paper",
+            "timestamp": "2026-09-23T13:00:00-04:00",
+            "revision": null,
+            "source_id": "fed-september"
+          },
+          {
+            "name": "H.15 - Selected Interest Rates",
+            "timestamp": "2026-09-23T16:15:00-04:00",
+            "revision": null,
+            "source_id": "fed-september"
+          }
+        ]
+      },
+      "globex": {
+        "open": "2026-09-22T18:00:00-04:00",
+        "close": "2026-09-23T17:00:00-04:00",
+        "breaks": []
+      }
+    },
+    {
+      "date": "2026-09-24",
+      "open": "2026-09-24T09:30:00-04:00",
+      "close": "2026-09-24T16:00:00-04:00",
+      "contract": "MNQ 12-26",
+      "roll_day": false,
+      "trade_enabled": false,
+      "news": {
+        "flags": [
+          "BEA_RELEASE",
+          "BLS_RELEASE",
+          "FED_RELEASE",
+          "bea-full",
+          "bls-september",
+          "fed-september"
+        ],
+        "releases": [
+          {
+            "name": "U.S. International Transactions and Investment Position, 2nd Quarter 2026",
+            "timestamp": "2026-09-24T08:30:00-04:00",
+            "revision": null,
+            "source_id": "bea-full"
+          },
+          {
+            "name": "Employee Tenure",
+            "timestamp": "2026-09-24T10:00:00-04:00",
+            "revision": null,
+            "source_id": "bls-september"
+          },
+          {
+            "name": "Job Flexibilities and Work Schedules",
+            "timestamp": "2026-09-24T10:00:00-04:00",
+            "revision": null,
+            "source_id": "bls-september"
+          },
+          {
+            "name": "CP - Commercial Paper",
+            "timestamp": "2026-09-24T13:00:00-04:00",
+            "revision": null,
+            "source_id": "fed-september"
+          },
+          {
+            "name": "Senior Credit Officer Opinion Survey on Dealer Financing Terms (SCOOS)",
+            "timestamp": "2026-09-24T14:00:00-04:00",
+            "revision": null,
+            "source_id": "fed-september"
+          },
+          {
+            "name": "H.15 - Selected Interest Rates",
+            "timestamp": "2026-09-24T16:15:00-04:00",
+            "revision": null,
+            "source_id": "fed-september"
+          },
+          {
+            "name": "H.4.1 - Factors Affecting Reserve Balances",
+            "timestamp": "2026-09-24T16:30:00-04:00",
+            "revision": null,
+            "source_id": "fed-september"
+          }
+        ]
+      },
+      "globex": {
+        "open": "2026-09-23T18:00:00-04:00",
+        "close": "2026-09-24T17:00:00-04:00",
+        "breaks": []
+      }
+    },
+    {
+      "date": "2026-09-25",
+      "open": "2026-09-25T09:30:00-04:00",
+      "close": "2026-09-25T16:00:00-04:00",
+      "contract": "MNQ 12-26",
+      "roll_day": false,
+      "trade_enabled": false,
+      "news": {
+        "flags": [
+          "BLS_RELEASE",
+          "FED_RELEASE",
+          "bls-september",
+          "fed-september"
+        ],
+        "releases": [
+          {
+            "name": "Employee Benefits in the United States",
+            "timestamp": "2026-09-25T10:00:00-04:00",
+            "revision": null,
+            "source_id": "bls-september"
+          },
+          {
+            "name": "CP - Commercial Paper",
+            "timestamp": "2026-09-25T13:00:00-04:00",
+            "revision": null,
+            "source_id": "fed-september"
+          },
+          {
+            "name": "H.15 - Selected Interest Rates",
+            "timestamp": "2026-09-25T16:15:00-04:00",
+            "revision": null,
+            "source_id": "fed-september"
+          },
+          {
+            "name": "H.8 - Assets and Liabilities of Commercial Banks in the U.S.",
+            "timestamp": "2026-09-25T16:15:00-04:00",
+            "revision": null,
+            "source_id": "fed-september"
+          }
+        ]
+      },
+      "globex": {
+        "open": "2026-09-24T18:00:00-04:00",
+        "close": "2026-09-25T17:00:00-04:00",
+        "breaks": []
+      }
+    },
+    {
+      "date": "2026-09-28",
+      "open": "2026-09-28T09:30:00-04:00",
+      "close": "2026-09-28T16:00:00-04:00",
+      "contract": "MNQ 12-26",
+      "roll_day": false,
+      "trade_enabled": false,
+      "news": {
+        "flags": [
+          "FED_RELEASE",
+          "FED_SPEECH",
+          "fed-september"
+        ],
+        "releases": [
+          {
+            "name": "Discussion - Vice Chair for Supervision Michelle W. Bowman: Recent Developments in Bank Supervision and Regulation",
+            "timestamp": "2026-09-28T08:15:00-04:00",
+            "revision": null,
+            "source_id": "fed-september"
+          },
+          {
+            "name": "CP - Commercial Paper",
+            "timestamp": "2026-09-28T13:00:00-04:00",
+            "revision": null,
+            "source_id": "fed-september"
+          },
+          {
+            "name": "Speech - Governor Lisa D. Cook: AI and Emerging Tech",
+            "timestamp": "2026-09-28T13:25:00-04:00",
+            "revision": null,
+            "source_id": "fed-september"
+          },
+          {
+            "name": "H.10 - Foreign Exchange Rates",
+            "timestamp": "2026-09-28T16:15:00-04:00",
+            "revision": null,
+            "source_id": "fed-september"
+          },
+          {
+            "name": "H.15 - Selected Interest Rates",
+            "timestamp": "2026-09-28T16:15:00-04:00",
+            "revision": null,
+            "source_id": "fed-september"
+          }
+        ]
+      },
+      "globex": {
+        "open": "2026-09-27T18:00:00-04:00",
+        "close": "2026-09-28T17:00:00-04:00",
+        "breaks": []
+      }
+    },
+    {
+      "date": "2026-09-29",
+      "open": "2026-09-29T09:30:00-04:00",
+      "close": "2026-09-29T16:00:00-04:00",
+      "contract": "MNQ 12-26",
+      "roll_day": false,
+      "trade_enabled": false,
+      "news": {
+        "flags": [
+          "BLS_RELEASE",
+          "FED_RELEASE",
+          "FED_SPEECH",
+          "bls-september",
+          "fed-september"
+        ],
+        "releases": [
+          {
+            "name": "Job Openings and Labor Turnover Survey",
+            "timestamp": "2026-09-29T10:00:00-04:00",
+            "revision": null,
+            "source_id": "bls-september"
+          },
+          {
+            "name": "Speech - Vice Chair for Supervision Michelle W. Bowman: Opening Remarks (via pre-recorded video)",
+            "timestamp": "2026-09-29T11:00:00-04:00",
+            "revision": null,
+            "source_id": "fed-september"
+          },
+          {
+            "name": "Speech - Governor Michael S. Barr: Economic Outlook",
+            "timestamp": "2026-09-29T12:40:00-04:00",
+            "revision": null,
+            "source_id": "fed-september"
+          },
+          {
+            "name": "CP - Commercial Paper",
+            "timestamp": "2026-09-29T13:00:00-04:00",
+            "revision": null,
+            "source_id": "fed-september"
+          },
+          {
+            "name": "Speech - Governor Christopher J. Waller: Payments",
+            "timestamp": "2026-09-29T15:00:00-04:00",
+            "revision": null,
+            "source_id": "fed-september"
+          },
+          {
+            "name": "H.15 - Selected Interest Rates",
+            "timestamp": "2026-09-29T16:15:00-04:00",
+            "revision": null,
+            "source_id": "fed-september"
+          }
+        ]
+      },
+      "globex": {
+        "open": "2026-09-28T18:00:00-04:00",
+        "close": "2026-09-29T17:00:00-04:00",
+        "breaks": []
+      }
+    },
+    {
+      "date": "2026-09-30",
+      "open": "2026-09-30T09:30:00-04:00",
+      "close": "2026-09-30T16:00:00-04:00",
+      "contract": "MNQ 12-26",
+      "roll_day": false,
+      "trade_enabled": false,
+      "news": {
+        "flags": [
+          "BLS_RELEASE",
+          "FED_RELEASE",
+          "FED_SPEECH",
+          "FED_UNTIMED",
+          "GDP",
+          "LATE_NEWS",
+          "PCE",
+          "bea-full",
+          "bls-september",
+          "fed-september"
+        ],
+        "releases": [
+          {
+            "name": "GDP (Third Estimate), Industries, Corporate Profits, State GDP, and State Personal Income, 2nd Quarter 2026; State PCE, 2025",
+            "timestamp": "2026-09-30T08:30:00-04:00",
+            "revision": null,
+            "source_id": "bea-full"
+          },
+          {
+            "name": "Personal Income and Outlays, August 2026",
+            "timestamp": "2026-09-30T08:30:00-04:00",
+            "revision": null,
+            "source_id": "bea-full"
+          },
+          {
+            "name": "Metropolitan Area Employment and Unemployment (Monthly)",
+            "timestamp": "2026-09-30T10:00:00-04:00",
+            "revision": null,
+            "source_id": "bls-september"
+          },
+          {
+            "name": "CP - Commercial Paper",
+            "timestamp": "2026-09-30T13:00:00-04:00",
+            "revision": null,
+            "source_id": "fed-september"
+          },
+          {
+            "name": "Speech - Governor Lisa D. Cook: Rural Economy",
+            "timestamp": "2026-09-30T15:25:00-04:00",
+            "revision": null,
+            "source_id": "fed-september"
+          },
+          {
+            "name": "H.15 - Selected Interest Rates",
+            "timestamp": "2026-09-30T16:15:00-04:00",
+            "revision": null,
+            "source_id": "fed-september"
+          }
+        ]
+      },
+      "globex": {
+        "open": "2026-09-29T18:00:00-04:00",
+        "close": "2026-09-30T17:00:00-04:00",
+        "breaks": []
+      }
+    },
+    {
+      "date": "2026-10-01",
+      "open": "2026-10-01T09:30:00-04:00",
+      "close": "2026-10-01T16:00:00-04:00",
+      "contract": "MNQ 12-26",
+      "roll_day": false,
+      "trade_enabled": false,
+      "news": {
+        "flags": [
+          "FED_RELEASE",
+          "FED_SPEECH",
+          "LATE_NEWS",
+          "fed-october"
+        ],
+        "releases": [
+          {
+            "name": "Speech - Governor Christopher J. Waller Watch Live Federal Reserve Economic Data At FRED Con: Navigating Trust, AI & Storytelling in a World of Data, St. Louis, Mo.",
+            "timestamp": "2026-10-01T10:00:00-04:00",
+            "revision": null,
+            "source_id": "fed-october"
+          },
+          {
+            "name": "Speech - Governor Christopher J. Waller: Federal Reserve Economic Data",
+            "timestamp": "2026-10-01T10:00:00-04:00",
+            "revision": null,
+            "source_id": "fed-october"
+          },
+          {
+            "name": "CP - Commercial Paper",
+            "timestamp": "2026-10-01T13:00:00-04:00",
+            "revision": null,
+            "source_id": "fed-october"
+          },
+          {
+            "name": "Speech - Vice Chair Philip N. Jefferson Watch Live U.S. Economy and Monetary Policy At a Talk and Q&A with Federal Reserve Board Vice Chair Philip N. Jefferson, Charlottesville, Va.",
+            "timestamp": "2026-10-01T13:30:00-04:00",
+            "revision": null,
+            "source_id": "fed-october"
+          },
+          {
+            "name": "Speech - Vice Chair Philip N. Jefferson: U.S. Economy and Monetary Policy",
+            "timestamp": "2026-10-01T13:30:00-04:00",
+            "revision": null,
+            "source_id": "fed-october"
+          },
+          {
+            "name": "Speech - Vice Chair for Supervision Michelle W. Bowman Watch Live Modernizing Financial Regulation: Initial Observations from eSLR At the Atlantic Council\u2019s Conversation with Michelle W. Bowman, Washington, D.C.",
+            "timestamp": "2026-10-01T15:00:00-04:00",
+            "revision": null,
+            "source_id": "fed-october"
+          },
+          {
+            "name": "Speech - Vice Chair for Supervision Michelle W. Bowman: Modernizing Financial Regulation: Initial Observations from eSLR",
+            "timestamp": "2026-10-01T15:00:00-04:00",
+            "revision": null,
+            "source_id": "fed-october"
+          },
+          {
+            "name": "Discussion - Governor Lisa D. Cook Global Central Banking At the Central Banking Seminar (Virtual)",
+            "timestamp": "2026-10-01T15:30:00-04:00",
+            "revision": null,
+            "source_id": "fed-october"
+          },
+          {
+            "name": "Discussion - Governor Lisa D. Cook: Global Central Banking",
+            "timestamp": "2026-10-01T15:30:00-04:00",
+            "revision": null,
+            "source_id": "fed-october"
+          },
+          {
+            "name": "G.5 - Foreign Exchange Rates",
+            "timestamp": "2026-10-01T16:15:00-04:00",
+            "revision": null,
+            "source_id": "fed-october"
+          },
+          {
+            "name": "H.15 - Selected Interest Rates",
+            "timestamp": "2026-10-01T16:15:00-04:00",
+            "revision": null,
+            "source_id": "fed-october"
+          },
+          {
+            "name": "H.4.1 - Factors Affecting Reserve Balances",
+            "timestamp": "2026-10-01T16:30:00-04:00",
+            "revision": null,
+            "source_id": "fed-october"
+          }
+        ]
+      },
+      "globex": {
+        "open": "2026-09-30T18:00:00-04:00",
+        "close": "2026-10-01T17:00:00-04:00",
+        "breaks": []
+      }
+    },
+    {
+      "date": "2026-10-02",
+      "open": "2026-10-02T09:30:00-04:00",
+      "close": "2026-10-02T16:00:00-04:00",
+      "contract": "MNQ 12-26",
+      "roll_day": false,
+      "trade_enabled": false,
+      "news": {
+        "flags": [
+          "FED_RELEASE",
+          "PAYROLLS",
+          "bls-october",
+          "fed-october"
+        ],
+        "releases": [
+          {
+            "name": "Employment Situation",
+            "timestamp": "2026-10-02T08:30:00-04:00",
+            "revision": null,
+            "source_id": "bls-october"
+          },
+          {
+            "name": "CP - Commercial Paper",
+            "timestamp": "2026-10-02T13:00:00-04:00",
+            "revision": null,
+            "source_id": "fed-october"
+          },
+          {
+            "name": "H.15 - Selected Interest Rates",
+            "timestamp": "2026-10-02T16:15:00-04:00",
+            "revision": null,
+            "source_id": "fed-october"
+          },
+          {
+            "name": "H.8 - Assets and Liabilities of Commercial Banks in the U.S.",
+            "timestamp": "2026-10-02T16:15:00-04:00",
+            "revision": null,
+            "source_id": "fed-october"
+          }
+        ]
+      },
+      "globex": {
+        "open": "2026-10-01T18:00:00-04:00",
+        "close": "2026-10-02T17:00:00-04:00",
+        "breaks": []
+      }
+    },
+    {
+      "date": "2026-10-05",
+      "open": "2026-10-05T09:30:00-04:00",
+      "close": "2026-10-05T16:00:00-04:00",
+      "contract": "MNQ 12-26",
+      "roll_day": false,
+      "trade_enabled": false,
+      "news": {
+        "flags": [
+          "FED_RELEASE",
+          "fed-october"
+        ],
+        "releases": [
+          {
+            "name": "CP - Commercial Paper",
+            "timestamp": "2026-10-05T13:00:00-04:00",
+            "revision": null,
+            "source_id": "fed-october"
+          },
+          {
+            "name": "H.10 - Foreign Exchange Rates",
+            "timestamp": "2026-10-05T16:15:00-04:00",
+            "revision": null,
+            "source_id": "fed-october"
+          },
+          {
+            "name": "H.15 - Selected Interest Rates",
+            "timestamp": "2026-10-05T16:15:00-04:00",
+            "revision": null,
+            "source_id": "fed-october"
+          }
+        ]
+      },
+      "globex": {
+        "open": "2026-10-04T18:00:00-04:00",
+        "close": "2026-10-05T17:00:00-04:00",
+        "breaks": []
+      }
+    },
+    {
+      "date": "2026-10-06",
+      "open": "2026-10-06T09:30:00-04:00",
+      "close": "2026-10-06T16:00:00-04:00",
+      "contract": "MNQ 12-26",
+      "roll_day": false,
+      "trade_enabled": false,
+      "news": {
+        "flags": [
+          "BEA_RELEASE",
+          "FED_RELEASE",
+          "FED_SPEECH",
+          "bea-full",
+          "fed-october"
+        ],
+        "releases": [
+          {
+            "name": "U.S. International Trade in Goods and Services, August 2026",
+            "timestamp": "2026-10-06T08:30:00-04:00",
+            "revision": null,
+            "source_id": "bea-full"
+          },
+          {
+            "name": "Services Supplied Through Affiliates, 2024",
+            "timestamp": "2026-10-06T10:00:00-04:00",
+            "revision": null,
+            "source_id": "bea-full"
+          },
+          {
+            "name": "Speech - Vice Chair for Supervision Michelle W. Bowman Watch Live Modernizing Regulation and Supervision At the 2026 Community Banking Research Conference, St. Louis, Missouri",
+            "timestamp": "2026-10-06T10:45:00-04:00",
+            "revision": null,
+            "source_id": "fed-october"
+          },
+          {
+            "name": "Speech - Vice Chair for Supervision Michelle W. Bowman: Modernizing Regulation and Supervision",
+            "timestamp": "2026-10-06T10:45:00-04:00",
+            "revision": null,
+            "source_id": "fed-october"
+          },
+          {
+            "name": "CP - Commercial Paper",
+            "timestamp": "2026-10-06T13:00:00-04:00",
+            "revision": null,
+            "source_id": "fed-october"
+          },
+          {
+            "name": "H.15 - Selected Interest Rates",
+            "timestamp": "2026-10-06T16:15:00-04:00",
+            "revision": null,
+            "source_id": "fed-october"
+          }
+        ]
+      },
+      "globex": {
+        "open": "2026-10-05T18:00:00-04:00",
+        "close": "2026-10-06T17:00:00-04:00",
+        "breaks": []
+      }
+    },
+    {
+      "date": "2026-10-07",
+      "open": "2026-10-07T09:30:00-04:00",
+      "close": "2026-10-07T16:00:00-04:00",
+      "contract": "MNQ 12-26",
+      "roll_day": false,
+      "trade_enabled": true,
+      "news": {
+        "flags": [
+          "FED_RELEASE",
+          "FOMC",
+          "fed-october"
+        ],
+        "releases": [
+          {
+            "name": "CP - Commercial Paper",
+            "timestamp": "2026-10-07T13:00:00-04:00",
+            "revision": null,
+            "source_id": "fed-october"
+          },
+          {
+            "name": "FOMC Minutes",
+            "timestamp": "2026-10-07T14:00:00-04:00",
+            "revision": null,
+            "source_id": "fed-october"
+          },
+          {
+            "name": "FOMC Minutes Meeting of September 15-16",
+            "timestamp": "2026-10-07T14:00:00-04:00",
+            "revision": null,
+            "source_id": "fed-october"
+          },
+          {
+            "name": "G.19 - Consumer Credit",
+            "timestamp": "2026-10-07T15:00:00-04:00",
+            "revision": null,
+            "source_id": "fed-october"
+          },
+          {
+            "name": "H.15 - Selected Interest Rates",
+            "timestamp": "2026-10-07T16:15:00-04:00",
+            "revision": null,
+            "source_id": "fed-october"
+          }
+        ]
+      },
+      "globex": {
+        "open": "2026-10-06T18:00:00-04:00",
+        "close": "2026-10-07T17:00:00-04:00",
+        "breaks": []
+      }
+    },
+    {
+      "date": "2026-10-08",
+      "open": "2026-10-08T09:30:00-04:00",
+      "close": "2026-10-08T16:00:00-04:00",
+      "contract": "MNQ 12-26",
+      "roll_day": false,
+      "trade_enabled": true,
+      "news": {
+        "flags": [
+          "FED_RELEASE",
+          "FED_SPEECH",
+          "fed-october"
+        ],
+        "releases": [
+          {
+            "name": "Speech - Governor Christopher J. Waller Watch Live Economic Outlook At the Central Bank of the Republic of T\u00fcrkiye (TCMB) \u0130stanbul Economic Forum, \u00dcmraniye/\u0130stanbul, T\u00fcrkiye",
+            "timestamp": "2026-10-08T04:30:00-04:00",
+            "revision": null,
+            "source_id": "fed-october"
+          },
+          {
+            "name": "Speech - Governor Christopher J. Waller: Economic Outlook",
+            "timestamp": "2026-10-08T04:30:00-04:00",
+            "revision": null,
+            "source_id": "fed-october"
+          },
+          {
+            "name": "CP - Commercial Paper",
+            "timestamp": "2026-10-08T13:00:00-04:00",
+            "revision": null,
+            "source_id": "fed-october"
+          },
+          {
+            "name": "H.15 - Selected Interest Rates",
+            "timestamp": "2026-10-08T16:15:00-04:00",
+            "revision": null,
+            "source_id": "fed-october"
+          },
+          {
+            "name": "H.4.1 - Factors Affecting Reserve Balances",
+            "timestamp": "2026-10-08T16:30:00-04:00",
+            "revision": null,
+            "source_id": "fed-october"
+          }
+        ]
+      },
+      "globex": {
+        "open": "2026-10-07T18:00:00-04:00",
+        "close": "2026-10-08T17:00:00-04:00",
+        "breaks": []
+      }
+    },
+    {
+      "date": "2026-10-09",
+      "open": "2026-10-09T09:30:00-04:00",
+      "close": "2026-10-09T16:00:00-04:00",
+      "contract": "MNQ 12-26",
+      "roll_day": false,
+      "trade_enabled": true,
+      "news": {
+        "flags": [
+          "FED_RELEASE",
+          "fed-october"
+        ],
+        "releases": [
+          {
+            "name": "CP - Commercial Paper",
+            "timestamp": "2026-10-09T13:00:00-04:00",
+            "revision": null,
+            "source_id": "fed-october"
+          },
+          {
+            "name": "H.15 - Selected Interest Rates",
+            "timestamp": "2026-10-09T16:15:00-04:00",
+            "revision": null,
+            "source_id": "fed-october"
+          },
+          {
+            "name": "H.8 - Assets and Liabilities of Commercial Banks in the U.S.",
+            "timestamp": "2026-10-09T16:15:00-04:00",
+            "revision": null,
+            "source_id": "fed-october"
+          }
+        ]
+      },
+      "globex": {
+        "open": "2026-10-08T18:00:00-04:00",
+        "close": "2026-10-09T17:00:00-04:00",
+        "breaks": []
+      }
+    },
+    {
+      "date": "2026-10-12",
+      "open": "2026-10-12T09:30:00-04:00",
+      "close": "2026-10-12T16:00:00-04:00",
+      "contract": "MNQ 12-26",
+      "roll_day": false,
+      "trade_enabled": true,
+      "news": {
+        "flags": [],
+        "releases": []
+      },
+      "globex": {
+        "open": "2026-10-11T18:00:00-04:00",
+        "close": "2026-10-12T17:00:00-04:00",
+        "breaks": []
+      }
+    },
+    {
+      "date": "2026-10-13",
+      "open": "2026-10-13T09:30:00-04:00",
+      "close": "2026-10-13T16:00:00-04:00",
+      "contract": "MNQ 12-26",
+      "roll_day": false,
+      "trade_enabled": true,
+      "news": {
+        "flags": [
+          "fed-october"
+        ],
+        "releases": [
+          {
+            "name": "CP - Commercial Paper",
+            "timestamp": "2026-10-13T13:00:00-04:00",
+            "revision": null,
+            "source_id": "fed-october"
+          },
+          {
+            "name": "H.10 - Foreign Exchange Rates",
+            "timestamp": "2026-10-13T16:15:00-04:00",
+            "revision": null,
+            "source_id": "fed-october"
+          },
+          {
+            "name": "H.15 - Selected Interest Rates",
+            "timestamp": "2026-10-13T16:15:00-04:00",
+            "revision": null,
+            "source_id": "fed-october"
+          }
+        ]
+      },
+      "globex": {
+        "open": "2026-10-12T18:00:00-04:00",
+        "close": "2026-10-13T17:00:00-04:00",
+        "breaks": []
+      }
+    },
+    {
+      "date": "2026-10-14",
+      "open": "2026-10-14T09:30:00-04:00",
+      "close": "2026-10-14T16:00:00-04:00",
+      "contract": "MNQ 12-26",
+      "roll_day": false,
+      "trade_enabled": true,
+      "news": {
+        "flags": [
+          "bls-october",
+          "fed-october"
+        ],
+        "releases": [
+          {
+            "name": "Consumer Price Index",
+            "timestamp": "2026-10-14T08:30:00-04:00",
+            "revision": null,
+            "source_id": "bls-october"
+          },
+          {
+            "name": "Real Earnings",
+            "timestamp": "2026-10-14T08:30:00-04:00",
+            "revision": null,
+            "source_id": "bls-october"
+          },
+          {
+            "name": "CP - Commercial Paper",
+            "timestamp": "2026-10-14T13:00:00-04:00",
+            "revision": null,
+            "source_id": "fed-october"
+          },
+          {
+            "name": "Beige Book",
+            "timestamp": "2026-10-14T14:00:00-04:00",
+            "revision": null,
+            "source_id": "fed-october"
+          },
+          {
+            "name": "H.15 - Selected Interest Rates",
+            "timestamp": "2026-10-14T16:15:00-04:00",
+            "revision": null,
+            "source_id": "fed-october"
+          }
+        ]
+      },
+      "globex": {
+        "open": "2026-10-13T18:00:00-04:00",
+        "close": "2026-10-14T17:00:00-04:00",
+        "breaks": []
+      }
+    },
+    {
+      "date": "2026-10-15",
+      "open": "2026-10-15T09:30:00-04:00",
+      "close": "2026-10-15T16:00:00-04:00",
+      "contract": "MNQ 12-26",
+      "roll_day": false,
+      "trade_enabled": true,
+      "news": {
+        "flags": [
+          "bls-october",
+          "fed-october"
+        ],
+        "releases": [
+          {
+            "name": "Producer Price Index",
+            "timestamp": "2026-10-15T08:30:00-04:00",
+            "revision": null,
+            "source_id": "bls-october"
+          },
+          {
+            "name": "CP - Commercial Paper",
+            "timestamp": "2026-10-15T13:00:00-04:00",
+            "revision": null,
+            "source_id": "fed-october"
+          },
+          {
+            "name": "H.15 - Selected Interest Rates",
+            "timestamp": "2026-10-15T16:15:00-04:00",
+            "revision": null,
+            "source_id": "fed-october"
+          },
+          {
+            "name": "H.4.1 - Factors Affecting Reserve Balances",
+            "timestamp": "2026-10-15T16:30:00-04:00",
+            "revision": null,
+            "source_id": "fed-october"
+          }
+        ]
+      },
+      "globex": {
+        "open": "2026-10-14T18:00:00-04:00",
+        "close": "2026-10-15T17:00:00-04:00",
+        "breaks": []
+      }
+    },
+    {
+      "date": "2026-10-16",
+      "open": "2026-10-16T09:30:00-04:00",
+      "close": "2026-10-16T16:00:00-04:00",
+      "contract": "MNQ 12-26",
+      "roll_day": false,
+      "trade_enabled": true,
+      "news": {
+        "flags": [
+          "bls-october",
+          "fed-october"
+        ],
+        "releases": [
+          {
+            "name": "U.S. Import and Export Price Indexes",
+            "timestamp": "2026-10-16T08:30:00-04:00",
+            "revision": null,
+            "source_id": "bls-october"
+          },
+          {
+            "name": "G.17 - Industrial Production and Capacity Utilization",
+            "timestamp": "2026-10-16T09:15:00-04:00",
+            "revision": null,
+            "source_id": "fed-october"
+          },
+          {
+            "name": "CP - Commercial Paper",
+            "timestamp": "2026-10-16T13:00:00-04:00",
+            "revision": null,
+            "source_id": "fed-october"
+          },
+          {
+            "name": "H.15 - Selected Interest Rates",
+            "timestamp": "2026-10-16T16:15:00-04:00",
+            "revision": null,
+            "source_id": "fed-october"
+          },
+          {
+            "name": "H.8 - Assets and Liabilities of Commercial Banks in the U.S.",
+            "timestamp": "2026-10-16T16:15:00-04:00",
+            "revision": null,
+            "source_id": "fed-october"
+          }
+        ]
+      },
+      "globex": {
+        "open": "2026-10-15T18:00:00-04:00",
+        "close": "2026-10-16T17:00:00-04:00",
+        "breaks": []
+      }
+    },
+    {
+      "date": "2026-10-19",
+      "open": "2026-10-19T09:30:00-04:00",
+      "close": "2026-10-19T16:00:00-04:00",
+      "contract": "MNQ 12-26",
+      "roll_day": false,
+      "trade_enabled": true,
+      "news": {
+        "flags": [
+          "fed-october"
+        ],
+        "releases": [
+          {
+            "name": "CP - Commercial Paper",
+            "timestamp": "2026-10-19T13:00:00-04:00",
+            "revision": null,
+            "source_id": "fed-october"
+          },
+          {
+            "name": "H.10 - Foreign Exchange Rates",
+            "timestamp": "2026-10-19T16:15:00-04:00",
+            "revision": null,
+            "source_id": "fed-october"
+          },
+          {
+            "name": "H.15 - Selected Interest Rates",
+            "timestamp": "2026-10-19T16:15:00-04:00",
+            "revision": null,
+            "source_id": "fed-october"
+          }
+        ]
+      },
+      "globex": {
+        "open": "2026-10-18T18:00:00-04:00",
+        "close": "2026-10-19T17:00:00-04:00",
+        "breaks": []
+      }
+    },
+    {
+      "date": "2026-10-20",
+      "open": "2026-10-20T09:30:00-04:00",
+      "close": "2026-10-20T16:00:00-04:00",
+      "contract": "MNQ 12-26",
+      "roll_day": false,
+      "trade_enabled": true,
+      "news": {
+        "flags": [
+          "bls-october",
+          "fed-october"
+        ],
+        "releases": [
+          {
+            "name": "State Employment and Unemployment (Monthly)",
+            "timestamp": "2026-10-20T10:00:00-04:00",
+            "revision": null,
+            "source_id": "bls-october"
+          },
+          {
+            "name": "CP - Commercial Paper",
+            "timestamp": "2026-10-20T13:00:00-04:00",
+            "revision": null,
+            "source_id": "fed-october"
+          },
+          {
+            "name": "H.15 - Selected Interest Rates",
+            "timestamp": "2026-10-20T16:15:00-04:00",
+            "revision": null,
+            "source_id": "fed-october"
+          }
+        ]
+      },
+      "globex": {
+        "open": "2026-10-19T18:00:00-04:00",
+        "close": "2026-10-20T17:00:00-04:00",
+        "breaks": []
+      }
+    },
+    {
+      "date": "2026-10-21",
+      "open": "2026-10-21T09:30:00-04:00",
+      "close": "2026-10-21T16:00:00-04:00",
+      "contract": "MNQ 12-26",
+      "roll_day": false,
+      "trade_enabled": true,
+      "news": {
+        "flags": [
+          "bls-october",
+          "fed-october"
+        ],
+        "releases": [
+          {
+            "name": "Usual Weekly Earnings of Wage and Salary Workers",
+            "timestamp": "2026-10-21T10:00:00-04:00",
+            "revision": null,
+            "source_id": "bls-october"
+          },
+          {
+            "name": "CP - Commercial Paper",
+            "timestamp": "2026-10-21T13:00:00-04:00",
+            "revision": null,
+            "source_id": "fed-october"
+          },
+          {
+            "name": "H.15 - Selected Interest Rates",
+            "timestamp": "2026-10-21T16:15:00-04:00",
+            "revision": null,
+            "source_id": "fed-october"
+          }
+        ]
+      },
+      "globex": {
+        "open": "2026-10-20T18:00:00-04:00",
+        "close": "2026-10-21T17:00:00-04:00",
+        "breaks": []
+      }
+    },
+    {
+      "date": "2026-10-22",
+      "open": "2026-10-22T09:30:00-04:00",
+      "close": "2026-10-22T16:00:00-04:00",
+      "contract": "MNQ 12-26",
+      "roll_day": false,
+      "trade_enabled": true,
+      "news": {
+        "flags": [
+          "fed-october"
+        ],
+        "releases": [
+          {
+            "name": "CP - Commercial Paper",
+            "timestamp": "2026-10-22T13:00:00-04:00",
+            "revision": null,
+            "source_id": "fed-october"
+          },
+          {
+            "name": "H.15 - Selected Interest Rates",
+            "timestamp": "2026-10-22T16:15:00-04:00",
+            "revision": null,
+            "source_id": "fed-october"
+          },
+          {
+            "name": "H.4.1 - Factors Affecting Reserve Balances",
+            "timestamp": "2026-10-22T16:30:00-04:00",
+            "revision": null,
+            "source_id": "fed-october"
+          }
+        ]
+      },
+      "globex": {
+        "open": "2026-10-21T18:00:00-04:00",
+        "close": "2026-10-22T17:00:00-04:00",
+        "breaks": []
+      }
+    },
+    {
+      "date": "2026-10-23",
+      "open": "2026-10-23T09:30:00-04:00",
+      "close": "2026-10-23T16:00:00-04:00",
+      "contract": "MNQ 12-26",
+      "roll_day": false,
+      "trade_enabled": true,
+      "news": {
+        "flags": [
+          "fed-october"
+        ],
+        "releases": [
+          {
+            "name": "CP - Commercial Paper",
+            "timestamp": "2026-10-23T13:00:00-04:00",
+            "revision": null,
+            "source_id": "fed-october"
+          },
+          {
+            "name": "H.15 - Selected Interest Rates",
+            "timestamp": "2026-10-23T16:15:00-04:00",
+            "revision": null,
+            "source_id": "fed-october"
+          },
+          {
+            "name": "H.8 - Assets and Liabilities of Commercial Banks in the U.S.",
+            "timestamp": "2026-10-23T16:15:00-04:00",
+            "revision": null,
+            "source_id": "fed-october"
+          }
+        ]
+      },
+      "globex": {
+        "open": "2026-10-22T18:00:00-04:00",
+        "close": "2026-10-23T17:00:00-04:00",
+        "breaks": []
+      }
+    },
+    {
+      "date": "2026-10-26",
+      "open": "2026-10-26T09:30:00-04:00",
+      "close": "2026-10-26T16:00:00-04:00",
+      "contract": "MNQ 12-26",
+      "roll_day": false,
+      "trade_enabled": true,
+      "news": {
+        "flags": [
+          "fed-october"
+        ],
+        "releases": [
+          {
+            "name": "CP - Commercial Paper",
+            "timestamp": "2026-10-26T13:00:00-04:00",
+            "revision": null,
+            "source_id": "fed-october"
+          },
+          {
+            "name": "H.10 - Foreign Exchange Rates",
+            "timestamp": "2026-10-26T16:15:00-04:00",
+            "revision": null,
+            "source_id": "fed-october"
+          },
+          {
+            "name": "H.15 - Selected Interest Rates",
+            "timestamp": "2026-10-26T16:15:00-04:00",
+            "revision": null,
+            "source_id": "fed-october"
+          }
+        ]
+      },
+      "globex": {
+        "open": "2026-10-25T18:00:00-04:00",
+        "close": "2026-10-26T17:00:00-04:00",
+        "breaks": []
+      }
+    },
+    {
+      "date": "2026-10-27",
+      "open": "2026-10-27T09:30:00-04:00",
+      "close": "2026-10-27T16:00:00-04:00",
+      "contract": "MNQ 12-26",
+      "roll_day": false,
+      "trade_enabled": true,
+      "news": {
+        "flags": [
+          "fed-october"
+        ],
+        "releases": [
+          {
+            "name": "CP - Commercial Paper",
+            "timestamp": "2026-10-27T13:00:00-04:00",
+            "revision": null,
+            "source_id": "fed-october"
+          },
+          {
+            "name": "H.6 - Money Stock Measures",
+            "timestamp": "2026-10-27T13:00:00-04:00",
+            "revision": null,
+            "source_id": "fed-october"
+          },
+          {
+            "name": "H.15 - Selected Interest Rates",
+            "timestamp": "2026-10-27T16:15:00-04:00",
+            "revision": null,
+            "source_id": "fed-october"
+          }
+        ]
+      },
+      "globex": {
+        "open": "2026-10-26T18:00:00-04:00",
+        "close": "2026-10-27T17:00:00-04:00",
+        "breaks": []
+      }
+    },
+    {
+      "date": "2026-10-28",
+      "open": "2026-10-28T09:30:00-04:00",
+      "close": "2026-10-28T16:00:00-04:00",
+      "contract": "MNQ 12-26",
+      "roll_day": false,
+      "trade_enabled": true,
+      "news": {
+        "flags": [
+          "bls-october",
+          "fed-october"
+        ],
+        "releases": [
+          {
+            "name": "Metropolitan Area Employment and Unemployment (Monthly)",
+            "timestamp": "2026-10-28T10:00:00-04:00",
+            "revision": null,
+            "source_id": "bls-october"
+          },
+          {
+            "name": "Quarterly Data Series on Business Employment Dynamics",
+            "timestamp": "2026-10-28T10:00:00-04:00",
+            "revision": null,
+            "source_id": "bls-october"
+          },
+          {
+            "name": "CP - Commercial Paper",
+            "timestamp": "2026-10-28T13:00:00-04:00",
+            "revision": null,
+            "source_id": "fed-october"
+          },
+          {
+            "name": "FOMC Meeting Two-day meeting, October 27 - 28 Press Conference",
+            "timestamp": "2026-10-28T14:00:00-04:00",
+            "revision": null,
+            "source_id": "fed-october"
+          },
+          {
+            "name": "FOMC Press Conference",
+            "timestamp": "2026-10-28T14:30:00-04:00",
+            "revision": null,
+            "source_id": "fed-october"
+          },
+          {
+            "name": "H.15 - Selected Interest Rates",
+            "timestamp": "2026-10-28T16:15:00-04:00",
+            "revision": null,
+            "source_id": "fed-october"
+          }
+        ]
+      },
+      "globex": {
+        "open": "2026-10-27T18:00:00-04:00",
+        "close": "2026-10-28T17:00:00-04:00",
+        "breaks": []
+      }
+    },
+    {
+      "date": "2026-10-29",
+      "open": "2026-10-29T09:30:00-04:00",
+      "close": "2026-10-29T16:00:00-04:00",
+      "contract": "MNQ 12-26",
+      "roll_day": false,
+      "trade_enabled": true,
+      "news": {
+        "flags": [
+          "bea-full",
+          "bls-october",
+          "fed-october"
+        ],
+        "releases": [
+          {
+            "name": "GDP (Advance Estimate), 3rd Quarter 2026",
+            "timestamp": "2026-10-29T08:30:00-04:00",
+            "revision": null,
+            "source_id": "bea-full"
+          },
+          {
+            "name": "Personal Income and Outlays, September 2026",
+            "timestamp": "2026-10-29T08:30:00-04:00",
+            "revision": null,
+            "source_id": "bea-full"
+          },
+          {
+            "name": "Consumer Expenditures",
+            "timestamp": "2026-10-29T10:00:00-04:00",
+            "revision": null,
+            "source_id": "bls-october"
+          },
+          {
+            "name": "CP - Commercial Paper",
+            "timestamp": "2026-10-29T13:00:00-04:00",
+            "revision": null,
+            "source_id": "fed-october"
+          },
+          {
+            "name": "H.15 - Selected Interest Rates",
+            "timestamp": "2026-10-29T16:15:00-04:00",
+            "revision": null,
+            "source_id": "fed-october"
+          },
+          {
+            "name": "H.4.1 - Factors Affecting Reserve Balances",
+            "timestamp": "2026-10-29T16:30:00-04:00",
+            "revision": null,
+            "source_id": "fed-october"
+          }
+        ]
+      },
+      "globex": {
+        "open": "2026-10-28T18:00:00-04:00",
+        "close": "2026-10-29T17:00:00-04:00",
+        "breaks": []
+      }
+    },
+    {
+      "date": "2026-10-30",
+      "open": "2026-10-30T09:30:00-04:00",
+      "close": "2026-10-30T16:00:00-04:00",
+      "contract": "MNQ 12-26",
+      "roll_day": false,
+      "trade_enabled": true,
+      "news": {
+        "flags": [
+          "bls-october",
+          "fed-october"
+        ],
+        "releases": [
+          {
+            "name": "Employment Cost Index",
+            "timestamp": "2026-10-30T08:30:00-04:00",
+            "revision": null,
+            "source_id": "bls-october"
+          },
+          {
+            "name": "CP - Commercial Paper",
+            "timestamp": "2026-10-30T13:00:00-04:00",
+            "revision": null,
+            "source_id": "fed-october"
+          },
+          {
+            "name": "H.15 - Selected Interest Rates",
+            "timestamp": "2026-10-30T16:15:00-04:00",
+            "revision": null,
+            "source_id": "fed-october"
+          },
+          {
+            "name": "H.8 - Assets and Liabilities of Commercial Banks in the U.S.",
+            "timestamp": "2026-10-30T16:15:00-04:00",
+            "revision": null,
+            "source_id": "fed-october"
+          }
+        ]
+      },
+      "globex": {
+        "open": "2026-10-29T18:00:00-04:00",
+        "close": "2026-10-30T17:00:00-04:00",
+        "breaks": []
+      }
+    }
+  ],
+  "globex_policy": "Use dated CME schedules, not ClearPort/preopen hours. Futures trading date advances at 18:00 ET; flatten five minutes before each reviewed close. No midnight loss-budget reset.",
+  "full_session_hours_as_of": "2026-10-07T19:10:50.391807+00:00",
+  "historical_globex_segments_excluded": [
+    {
+      "trading_date": "2026-09-08",
+      "omitted_open": "2026-09-06T18:00:00-04:00",
+      "reason": "Historical holiday multi-open segment is excluded; only the final prior-evening segment supplies this warmup session."
+    }
+  ]
+}

@@ -18,7 +18,7 @@ import webbrowser
 
 
 PROJECT = Path(__file__).resolve().parent
-SIM_PRESET = PROJECT / "ninjatrader/calendars/mnq-dec26-sim101-2026-10-07-09"
+SIM_PRESET = PROJECT / "ninjatrader/calendars/mnq-dec26-full-session-2026-10-07-30"
 
 
 def check_package(calendar_dir=SIM_PRESET):
@@ -29,6 +29,8 @@ def check_package(calendar_dir=SIM_PRESET):
             "main.py",
             "bot/data.py",
             "bot/dashboard.py",
+            "bot/contracts.py",
+            "bot/fullsession.py",
             "ninjatrader/MNQPlanPaper.cs",
         )
     ] + [Path(calendar_dir) / name for name in ("calendar.json", "MNQCalendar.csv")]
@@ -108,7 +110,7 @@ def ninja_home(value):
     )
 
 
-def install(home, calendar_dir=SIM_PRESET, run_id="r1-sim101-001"):
+def install(home, calendar_dir=SIM_PRESET, run_id="r2-sim101-001"):
     check_package(calendar_dir)
     validate_run_id(run_id)
     from bot.data import Calendar, checksum
@@ -183,7 +185,7 @@ def install(home, calendar_dir=SIM_PRESET, run_id="r1-sim101-001"):
         f"Calendar allows {active[0]} through {active[-1]}; earlier dates only build ATR history."
     )
     print(
-        "In NinjaTrader: compile with F5; connect your live market-data feed; use MNQ 12-26, 5 Minute, Sim101, R1, Funded."
+        "In NinjaTrader: compile with F5; connect real-time CME market data; use MNQ DEC26, 5 Minute, CME US Index Futures ETH, Sim101, R2, Funded."
     )
     print(
         f"Research > Paper run ID: {run_id}. Leave historical orders False. Confirm enough individual-contract tick history before enabling."
@@ -323,7 +325,7 @@ def launch(home, run_id=None, dashboard_only=False):
         print(f"Existing logs: run={item['run_id']}; account={item['account']}; arm={item['strategy']}; latest={item['reason']}")
     if run_id is None:
         ids = {item["run_id"] for item in runs if item["account"] == "Sim101"}
-        default = next(iter(ids)) if len(ids) == 1 else "r1-sim101-001"
+        default = next(iter(ids)) if dashboard_only and len(ids) == 1 else "r2-sim101-001"
         print("Use the exact Research > Paper run ID shown in NinjaTrader. Existing logs may belong to stopped runs.")
         try:
             run_id = input(f"Paper run ID [{default}]: ").strip() or default
@@ -352,11 +354,11 @@ def main(argv=None):
         help="Install source/calendar, preserving different existing files in a backup",
     )
     install_parser.add_argument("--calendar-dir", type=Path, default=SIM_PRESET)
-    install_parser.add_argument("--run-id", default="r1-sim101-001")
+    install_parser.add_argument("--run-id", default="r2-sim101-001")
     dashboard = commands.add_parser(
         "dashboard", help="Watch native CSV logs and open the local dashboard"
     )
-    dashboard.add_argument("--run-id", default="r1-sim101-001")
+    dashboard.add_argument("--run-id", default="r2-sim101-001")
     dashboard.add_argument("--port", type=int, default=8765, help="Local browser port; an occupied port uses a free port")
     dashboard.add_argument(
         "--once", action="store_true", help="Export one standalone HTML snapshot and exit (writes to the run folder)"

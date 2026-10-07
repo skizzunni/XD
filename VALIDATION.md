@@ -6,7 +6,7 @@ available here; native compilation/playback and profitability are unverified.
 
 ## Checks completed
 
-- 91 automated tests: signal thresholds/freeze, ATR lag, Eastern/DST, early closes,
+- 121 automated tests: signal thresholds/freeze, ATR lag, Eastern/DST, early closes,
   rollover, news, bad/duplicate data, slippage caps, quote cost invariants,
   stop/time/target tick ordering, recovery reconstruction, unresolved-position
   preservation, account stages, net break-even/gap loss, research freeze/holdout
@@ -24,13 +24,44 @@ available here; native compilation/playback and profitability are unverified.
   risk/targets, independent loss reviews, bounded quality tightening/recovery,
   exclusion of faulted samples and future results, news pauses/flattening and
   warmup-only dates. Prior poor outcomes change actual entry acceptance.
+- R2's two 400-session full-session synthetic runs each processed 552,000 ticks
+  and closed 17,100 trades, with no overlapping positions or reused entry IDs.
+  Both had identical event SHA256
+  `7aaf2ab1f0bcae4918f0ccda3719f2801c6846fa12582fc74c20337efe485576`
+  and trade SHA256
+  `d7e7b49190e22f65a4f20fbbda0b6788f6de369d874c0cd9d6ecb2f7e2d29866`.
+  Separate learning totals reconciled to 12,160 overnight and 4,940 daytime
+  outcomes. Invented price paths cannot establish profitability.
+- R2 tests cover Sunday reopening, midnight risk continuity, both DST weekends,
+  maintenance/weekends, reviewed intraday breaks, early closes, quoted liquidity,
+  cumulative losses, evening/08:30 news exits and later re-entry, lagged cash ATR,
+  missing history/hours and unresolved exits. CLI replay exercises the SQLite
+  tick index, frozen R2 configuration, saved 30-question losses and dashboard.
+- The reviewed full-session calendar has 49 history/forward rows and 18 enabled
+  October 7–30 dates. Tests verify official retained CME receipt hashes, all
+  enabled open/close boundaries and reproducible thirteen-column native CSV
+  export. Timed BLS/BEA/Fed news includes CPI, GDP, FOMC and late releases.
+  One historical holiday multi-open segment is explicitly excluded.
 - Python compilation and unused/unbound-name analysis passed.
 - C# grammar parsing passed; this does not verify NinjaTrader API bindings.
+- The actual C# contract helpers were extracted, compiled with a checksum-verified
+  .NET 8 SDK and exercised against 4,425 cases, including all quarterly expiries,
+  wrong years/products and seeded invalid identifiers, plus actual extracted
+  session, learning and calendar-loader methods. Boundary assertions check
+  futures dates, break/close deadlines, profile learning and connection-startup
+  classification. Reproduce with
+  `python scripts/check_native_contracts.py --dotnet <dotnet-executable>`.
+  This compiles the helpers only; full NinjaTrader compilation remains unrun.
 - Dashboard JavaScript syntax and functional checks passed for summary cards,
   380 trade rows, a 76-row loss filter, equity chart and 30-question review display.
 - The current R1 dashboard also passed JavaScript syntax and DOM-harness checks
   for live open P&L, learning state, counts and win/loss filtering. Browser/Windows
   execution is still unrun. Native loss notifications no longer create fake exits.
+- Current R2 dashboard DOM checks passed for separate daytime/overnight filter
+  states and futures-day display. Python tests verify that native and replay
+  learning snapshots retain both profiles and overnight trades keep their
+  futures date across midnight. Existing diagnostic/all filters and delayed
+  delivery displays passed again against the final generated JavaScript.
 - The pinned, checksum-verified timezone package was tested with OS zone lookup
   disabled, matching Windows' need for packaged IANA time zones.
 
@@ -78,14 +109,37 @@ available here; native compilation/playback and profitability are unverified.
   R1 setup rejections as session blocks. HTTP tests verify that the report removes
   routine status rows while preserving the earlier evidence without changing
   the source CSV or creating HTML files. Native trading code was unchanged.
+- Repaired the confirmed `MNQ DEC26` / `MNQ 12-26` comparison defect from the
+  October 7 diagnostic report. Native entry checks and completed-session ATR
+  now recognize these names for the same expiry. Python replay also accepts the
+  aliases, preserves raw contract labels and deduplicates ticks across aliases.
+  Tests verify identical warmup/trades, repeated R1 entries, loss audits and
+  learning when the same contract switches names. Other expiries stay separate.
+- Added native receipt/quote-age telemetry and original price/volume/quote,
+  session bar-count and connection-status evidence to fault records. HTTP and
+  browser DOM checks verify the delivery-lag display and report. Old logs keep
+  the distinction between an old timestamp and a proven delayed delivery.
+  The user's NinjaTrader screenshot separately confirms delayed MNQ data;
+  real-time CME entitlement is still a local prerequisite, and the freshness
+  limit has not been relaxed.
+- Initial connection/status notifications and missing initial paired quotes now
+  wait without falsely latching a session failure. An actual interruption after
+  the first healthy Sim101 quote, owned orders, later bad quotes and stale prices
+  still preserve the fault/risk controls. Native execution remains unverified.
+- Added a separate R2 full-session engine/native arm with frozen entry profiles,
+  separate bounded learning, pre-close and break exits, reviewed Globex hours,
+  full-session news and a futures-date loss budget. P0/C1/R1 rules remain intact.
+  Updated launcher defaults and package preflight to install every R2 dependency
+  and use the same explicit run ID for setup and dashboard instructions.
 
 ## Outstanding acceptance and research
 
-R1 is an unvalidated adaptive paper experiment. Compile and exercise its native
+R1/R2 are unvalidated adaptive paper experiments. Compile and exercise their native
 owner lease, persisted risk/learning history, repeat setup claims, bracket cleanup,
 news pauses and callback ordering on Windows. Cloud tests do not execute those
 native methods. Compare adaptive and fixed-filter versions on untouched future
-data; the P0/C1 research family intentionally rejects R1.
+data; the P0/C1 research family intentionally rejects R1/R2. R2 also needs native
+acceptance across the evening open, midnight, news pauses and maintenance.
 
 Compile `MNQPlanPaper` in NinjaTrader 8; confirm native order and connection
 callbacks with market playback, including stop rejection/cancellation, disconnect

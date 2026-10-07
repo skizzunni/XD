@@ -1,4 +1,5 @@
 from contextlib import redirect_stdout
+from datetime import datetime, timedelta, timezone
 import io
 import json
 from pathlib import Path
@@ -148,7 +149,7 @@ class WindowsSetupTests(unittest.TestCase):
         watch.assert_called_once_with(self.home, "r1-sim101-001")
 
     def test_sim101_preset_trades_current_dates_and_blocks_historical_entries(self):
-        calendar = Calendar(windows_setup.SIM_PRESET / "calendar.json")
+        calendar = Calendar(windows_setup.PROJECT / "ninjatrader/calendars/mnq-dec26-sim101-2026-10-07-09/calendar.json")
         active = [str(s.day) for s in calendar.sessions.values() if s.trade_enabled]
         self.assertEqual(active, ["2026-10-07", "2026-10-08", "2026-10-09"])
         self.assertEqual(len(calendar.sessions), 34)
@@ -270,6 +271,25 @@ class BrowserDashboardTests(unittest.TestCase):
         self.assertEqual(report['entry_checks'], [])
         self.assertEqual(report['total_event_count'], 0)
         self.assertFalse(self.home.exists())
+
+    def test_browser_and_report_show_delayed_delivery_without_modifying_native_logs(self):
+        self.folder.mkdir(parents=True)
+        received = datetime.now(timezone.utc)
+        tick = received - timedelta(minutes=10)
+        ledger = self.folder / "Sim101_R1_events.csv"
+        ledger.write_text('sequence,timestamp,account,stage,arm,reason,details\n'
+                          + f'1,{tick.isoformat()},Sim101,Funded,R1,LIVE_STATUS,price=31300;blocked=True;received_at_et={received.isoformat()};feed_age_seconds=600;max_tick_gap_seconds=90\n')
+        before = ledger.read_bytes()
+        page, payload, _ = self.get()
+        timing = payload["entry_checks"][0]["feed_timing"]
+        self.assertEqual(timing["condition"], "DELAYED_OR_CLOCK_OFFSET")
+        self.assertEqual(timing["delivery_lag_seconds"], 600)
+        self.assertIn("Delivery lag at logged update", page)
+        with urlopen(self.url + 'diagnostics.json', timeout=3) as response:
+            report = json.loads(response.read())
+        self.assertEqual(report["entry_checks"][0]["feed_timing"]["condition"], "DELAYED_OR_CLOCK_OFFSET")
+        self.assertEqual(ledger.read_bytes(), before)
+        self.assertFalse((self.folder / 'dashboard.html').exists())
 
 
 if __name__ == "__main__":

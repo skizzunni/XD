@@ -79,8 +79,8 @@ def diagnose(trade, audit, events, config):
         "Was the signal based on the required completed bars?",
         "Six completed opening bars retained."
         if config.strategy == "P0"
-        else "R1 uses six closed rolling bars and a fresh pullback breakout."
-        if config.strategy == "R1"
+        else "R1/R2 use six closed rolling bars and a fresh pullback breakout."
+        if config.strategy in {"R1", "R2"}
         else "C1 uses three completed formation bars.",
         "pass"
         if config.strategy == "P0" and len(audit.get("opening_bars", [])) == 6
@@ -95,7 +95,7 @@ def diagnose(trade, audit, events, config):
     )
     add(
         "Calendar",
-        "Was this a full eligible RTH session?",
+        "Was this a reviewed full futures session?" if config.strategy == "R2" else "Was this a full eligible RTH session?",
         audit.get("calendar_reason", "Unknown"),
         "pass" if audit.get("calendar_reason") == "ELIGIBLE" else "flag",
     )
@@ -243,7 +243,7 @@ def diagnose(trade, audit, events, config):
     add(
         "Frequency",
         "Was this one fill for a fresh setup rather than a duplicate entry?",
-        "Entry fill count for this trade; R1 permits multiple distinct setups.",
+        "Entry fill count for this trade; R1/R2 permit multiple distinct setups.",
         "pass" if len(fills) == 1 else "flag",
         {"entry_fills": len(fills)},
     )
@@ -330,8 +330,8 @@ def diagnose(trade, audit, events, config):
         "causal_claim": "Diagnostics describe observations; they do not prove why a market moved.",
         "active_strategy_changed": False,
         "learning_at_entry": audit.get("learning_at_entry"),
-        "adaptation_policy": "R1 uses a bounded filter on completed results; broad strategy changes remain separate experiments"
-        if config.strategy == "R1"
+        "adaptation_policy": "R1/R2 use bounded filters on completed results; R2 separates overnight/daytime learning; broad strategy changes remain separate experiments"
+        if config.strategy in {"R1", "R2"}
         else "Frozen baseline",
     }
 

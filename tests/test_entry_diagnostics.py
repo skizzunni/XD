@@ -1,10 +1,11 @@
 import csv
 from datetime import datetime, timedelta, timezone
+import json
 from pathlib import Path
 import tempfile
 import unittest
 
-from bot.dashboard import native_payload
+from bot.dashboard import engine_learning_events, feed_timing, native_payload
 from windows_setup import diagnostic_report
 
 
@@ -95,6 +96,68 @@ class EntryDiagnosticTests(unittest.TestCase):
             ("2026-10-07T06:47:00-04:00", "CONFIGURATION", "arm=R1"),
         ])
         self.assertIsNone(native_payload([path])["entry_checks"][0]["blocked"])
+
+    def test_r2_native_ledger_retains_both_profiles_and_overnight_futures_day(self):
+        path = self.ledger("R2_events.csv", [
+            ("2026-10-11T23:50:00-04:00", "ADAPTATION_UPDATE", "direction=1;regime=RTH;observations=8;recent_net_usd=10;min_efficiency=0.4"),
+            ("2026-10-11T23:50:01-04:00", "ADAPTATION_UPDATE", "direction=1;regime=OVERNIGHT;observations=8;recent_net_usd=-10;min_efficiency=0.7"),
+            ("2026-10-11T23:55:00-04:00", "FILLED", "name=MNQ_ENTRY;price=20000;quantity=1;direction=1;order_id=night-1;futures_day=2026-10-12;regime=OVERNIGHT"),
+            ("2026-10-12T00:05:00-04:00", "STOP_EXIT", "net_usd=-10;fees=1"),
+        ], arm="R2")
+        payload = native_payload([path])
+        self.assertEqual({s["regime"] for s in payload["learning_status"]}, {"RTH", "OVERNIGHT"})
+        self.assertEqual(payload["trades"][0]["session"], "2026-10-12")
+        self.assertEqual(payload["trades"][0]["regime"], "OVERNIGHT")
+        self.assertEqual(payload["pending_positions"], [])
+
+    def test_replay_dashboard_retains_latest_learning_per_direction_and_profile(self):
+        rows = [
+            {"reason":"ADAPTATION_UPDATE", "direction":1, "regime":"RTH", "observations":1},
+            {"reason":"ADAPTATION_UPDATE", "direction":1, "regime":"OVERNIGHT", "observations":2},
+            {"reason":"ADAPTATION_UPDATE", "direction":1, "regime":"RTH", "observations":3},
+        ]
+        (self.root/"events.jsonl").write_text("\n".join(json.dumps(r) for r in rows))
+        latest = {r["regime"]:r["observations"] for r in engine_learning_events(self.root)}
+        self.assertEqual(latest, {"RTH":3, "OVERNIGHT":2})
+
+
+class FeedTimingTests(unittest.TestCase):
+    def test_confirmed_report_timing_is_old_without_claiming_connection_state(self):
+        timing = feed_timing({
+            "account": "Sim101", "timestamp": "2026-10-07T14:16:05.9770000-04:00",
+            "details": "blocked=True",
+        }, datetime.fromisoformat("2026-10-07T18:26:08.271174+00:00"))
+        self.assertAlmostEqual(timing["tick_age_seconds"], 602.294174)
+        self.assertEqual(timing["condition"], "OLD_TICK_TIMESTAMP")
+        self.assertIsNone(timing["delivery_lag_seconds"])
+        self.assertIn("cannot distinguish", timing["message"])
+
+    def test_fresh_delivery_of_delayed_prices_is_not_labeled_a_current_feed(self):
+        timing = feed_timing({
+            "account": "Sim101", "timestamp": "2026-10-07T14:16:05-04:00",
+            "details": "received_at_et=2026-10-07T14:26:05-04:00;max_tick_gap_seconds=90",
+        }, datetime.fromisoformat("2026-10-07T18:26:08+00:00"))
+        self.assertEqual(timing["condition"], "DELAYED_OR_CLOCK_OFFSET")
+        self.assertEqual(timing["delivery_lag_seconds"], 600)
+        self.assertEqual(timing["receipt_age_seconds"], 3)
+        self.assertEqual(timing["limit_source"], "native")
+
+    def test_actual_native_limit_and_clock_offset_are_reported(self):
+        live = {"account": "Sim101", "timestamp": "2026-10-07T14:26:00-04:00",
+                "details": "received_at_et=2026-10-07T14:26:00-04:00;max_tick_gap_seconds=1"}
+        self.assertEqual(feed_timing(live, datetime.fromisoformat("2026-10-07T18:26:05+00:00"))["condition"], "OLD_TICK_TIMESTAMP")
+        self.assertEqual(feed_timing(live, datetime.fromisoformat("2026-10-07T18:25:00+00:00"))["condition"], "CLOCK_AHEAD")
+
+    def test_playback_and_invalid_timestamps_do_not_claim_live_feed_freshness(self):
+        for live in (None, {"account": "Playback101", "timestamp": "2020-01-01T12:00:00-05:00"},
+                     {"account": "Sim101", "timestamp": "bad"},
+                     {"account": "Sim101", "timestamp": "2026-10-07T12:00:00"}):
+            self.assertIsNone(feed_timing(live))
+        live = {"account": "Sim101", "timestamp": "2026-10-07T14:26:00-04:00",
+                "details": "received_at_et=bad;max_tick_gap_seconds=NaN"}
+        result = feed_timing(live, datetime(2026, 10, 7, 18, 26, tzinfo=timezone.utc))
+        self.assertEqual(result["condition"], "RECENT_TICK_TIMESTAMP")
+        self.assertEqual(result["limit_source"], "dashboard_default")
 
 
 if __name__ == "__main__":

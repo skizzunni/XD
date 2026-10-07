@@ -1,5 +1,13 @@
 # Watch MNQ trade current market prices on Sim101
 
+The latest package installs the full-session **R2** calendar and strategy default.
+For the requested overnight paper test, follow [R2-START-HERE.md](R2-START-HERE.md).
+The R1 instructions below describe the earlier cash-session experiment.
+
+For the October 7 report with `UNRESOLVED_CONTRACT`, zero ATR, P0 and delayed
+quotes, follow [FIX-BLOCKED-SIM101.md](FIX-BLOCKED-SIM101.md). It installs the
+contract-name fix and starts a fresh R1 run with a matching dashboard.
+
 The errors in your screenshot came from running project commands at
 `C:\Users\skyma`, where `requirements.txt` and `ninjatrader` do not exist.
 The launcher below changes to its own extracted project folder automatically.

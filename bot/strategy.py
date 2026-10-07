@@ -37,14 +37,15 @@ class RollingSetup:
     momentum: float
 
 
-def rolling_setup(bars, session, atr, momentum_threshold=0.05, min_efficiency=0.40):
+def rolling_setup(bars, session, atr, momentum_threshold=0.05, min_efficiency=0.40,
+                  entry_start=None, entry_end=None, max_stop_atr=0.20):
     if len(bars) < 6 or atr <= 0:
         return None
     window = bars[-6:]
     if any(a.end != b.start for a, b in zip(window, window[1:])):
         return None
     a, b, c = window[-3:]
-    if not session.at(10, 0) <= c.end <= session.at(15, 45):
+    if not (entry_start or session.at(10, 0)) <= c.end <= (entry_end or session.at(15, 45)):
         return None
     change = c.close - window[0].open
     momentum = change / atr
@@ -78,7 +79,7 @@ def rolling_setup(bars, session, atr, momentum_threshold=0.05, min_efficiency=0.
             return None
         stop = b.high + TICK
     risk = direction * (c.close - stop)
-    if risk <= 0 or risk > 0.20 * atr:
+    if risk <= 0 or risk > max_stop_atr * atr:
         return None
     return RollingSetup(
         direction,

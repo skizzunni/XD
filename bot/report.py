@@ -168,8 +168,9 @@ def engine_report(engine, synthetic=False):
             for s in engine.session_records
         ),
         "event_hash": engine.event_hash(),
-        "trade_count_cap": None if engine.config.strategy == "R1" else 1,
-        "learning_samples": len(engine.learner.samples),
+        "trade_count_cap": None if engine.config.strategy in {"R1", "R2"} else 1,
+        "learning_samples": len(engine.learner.samples) + (len(engine.overnight_learner.samples) if engine.config.strategy == "R2" else 0),
+        "learning_profiles": {"RTH": len(engine.learner.samples), **({"OVERNIGHT": len(engine.overnight_learner.samples)} if engine.config.strategy == "R2" else {})},
         "decision": "SYNTHETIC_SMOKE_TEST_ONLY"
         if synthetic
         else "RESEARCH_GATES_NOT_YET_EVALUATED",

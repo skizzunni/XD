@@ -16,7 +16,11 @@ def replay(ticks_path, calendar_path, config, start=None, end=None):
     start = date.fromisoformat(start) if isinstance(start, str) else start
     end = date.fromisoformat(end) if isinstance(end, str) else end
     index = TickIndex()
-    engine = Engine(config, calendar, start, end, tick_index=index)
+    if config.strategy == "R2":
+        from .fullsession import FullSessionEngine, FullSessionCalendar
+        engine = FullSessionEngine(config, FullSessionCalendar(calendar), start, end, tick_index=index)
+    else:
+        engine = Engine(config, calendar, start, end, tick_index=index)
     engine.calendar_checksum = checksum(calendar_path)
     count = 0
     try:

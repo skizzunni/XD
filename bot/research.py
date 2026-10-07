@@ -68,9 +68,9 @@ def pbo(results, days, blocks=8):
 
 
 def prepare(ticks_path, calendar_path, config, directory):
-    if config.strategy == "R1":
+    if config.strategy in {"R1", "R2"}:
         raise ValueError(
-            "R1 adaptive scanning is an unvalidated paper experiment; the existing research family covers P0/C1 only"
+            "R1/R2 adaptive scanning are unvalidated paper experiments; the existing research family covers P0/C1 only"
         )
     if config.daily_profit_target_usd or config.break_even_trigger_r:
         raise ValueError(

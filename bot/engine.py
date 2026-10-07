@@ -7,6 +7,7 @@ import json
 import math
 
 from .broker import PaperBroker
+from .contracts import contract_key, same_contract
 from .learning import QualityLearner
 from .models import Bar, TICK, TICK_VALUE, round_outward
 from .strategy import fvg_setup, momentum_direction, rolling_setup
@@ -36,6 +37,28 @@ class Engine:
         self.trade_sequence = 0
         self._reset_session()
 
+    @property
+    def rolling(self):
+        return self.config.strategy in {"R1", "R2"}
+
+    def rolling_rules(self, timestamp):
+        return {"efficiency": self.config.rolling_min_efficiency, "stop_atr": 0.20,
+                "target_r": 1.5, "hold_minutes": 30,
+                "entry_start": self.session.at(10, 0), "entry_end": self.session.at(15, 45),
+                "regime": "RTH"}
+
+    def quality_learner(self, timestamp):
+        return self.learner
+
+    def flatten_time(self):
+        return self.session.close - timedelta(minutes=5) if self.config.strategy == "R2" else self.session.at(15, 59 if self.config.strategy == "P0" else 55)
+
+    def gap_seconds(self, previous, current, session):
+        return (current - previous).total_seconds()
+
+    def scheduled_exit_reason(self):
+        return "TIME_EXIT"
+
     def _reset_session(self):
         self.bars, self.current_bar = [], None
         self.blocked = False
@@ -55,6 +78,7 @@ class Engine:
         self.rolling_signal = None
         self.learning_at_entry = None
         self.active_order_id = None
+        self.entry_rules = None
 
     def log(self, tick_or_time, stage, reason, **details):
         ts = (
@@ -78,7 +102,7 @@ class Engine:
     def fault(self, tick, reason):
         self.blocked = self.quality_fault = True
         self.log(tick, "eligibility", reason)
-        if self.broker.position and tick.contract == self.broker.position.contract:
+        if self.broker.position and same_contract(tick.contract, self.broker.position.contract):
             self._exit(tick, "FAULT_EXIT")
 
     def _start_session(self, session):
@@ -119,7 +143,7 @@ class Engine:
 
     def _eligibility(self, session):
         if (
-            self.config.strategy == "R1"
+            self.rolling
             and session.trade_enabled
             and session.eligibility == "NEWS_WINDOW"
         ):
@@ -136,31 +160,36 @@ class Engine:
         )
         self.current_bar = None
         if (
-            self.config.strategy == "R1"
+            self.rolling
             and not self.blocked
             and not self.broker.position
         ):
             self.rolling_signal = None
             self.attempted = False
             if self.last_exit_time is None or bar.end > self.last_exit_time:
+                rules = self.rolling_rules(bar.end)
                 found = rolling_setup(
                     self.bars,
                     self.session,
                     self.atr,
                     self.config.rolling_momentum_threshold,
-                    self.config.rolling_min_efficiency,
+                    rules["efficiency"],
+                    entry_start=rules["entry_start"], entry_end=rules["entry_end"],
+                    max_stop_atr=rules["stop_atr"],
                 )
                 if found:
-                    state = self.learner.state(found.direction, found.formed)
+                    state = self.quality_learner(found.formed).state(found.direction, found.formed)
                     if found.efficiency >= state["min_efficiency"]:
                         self.rolling_signal = found
+                        self.entry_rules = rules
                         self.learning_at_entry = state
                         self.m = found.momentum
                         self.log(
                             bar.end,
                             "signal",
                             "LONG" if found.direction > 0 else "SHORT",
-                            setup="R1",
+                            setup=self.config.strategy,
+                            regime=rules["regime"],
                             efficiency=found.efficiency,
                             min_efficiency=state["min_efficiency"],
                             source_bars=[asdict(b) for b in self.bars[-6:]],
@@ -223,7 +252,7 @@ class Engine:
             high = max(b.high for b in self.bars)
             low = min(b.low for b in self.bars)
             tr = high - low
-            if self.previous_close is not None and self.previous_contract == s.contract:
+            if self.previous_close is not None and same_contract(self.previous_contract, s.contract):
                 tr = max(
                     tr, abs(high - self.previous_close), abs(low - self.previous_close)
                 )
@@ -267,7 +296,7 @@ class Engine:
             self.blocked = self.quality_fault = True
             self.log(tick, "eligibility", "BAD_TIMESTAMP")
             raise ValueError("BAD_TIMESTAMP: ticks must be chronological")
-        key = (tick.contract, tick.tick_id)
+        key = (contract_key(tick.contract), tick.tick_id)
         unique = (
             self.tick_index.register(key)
             if self.tick_index is not None
@@ -296,7 +325,7 @@ class Engine:
             if tick.timestamp >= session.close and self.broker.position:
                 self.fault(tick, "DATA_GAP")
             return
-        if tick.contract != session.contract:
+        if not same_contract(tick.contract, session.contract):
             self.fault(tick, "UNRESOLVED_CONTRACT")
             raise ValueError(
                 "UNRESOLVED_CONTRACT: tick differs from explicit session contract map"
@@ -310,7 +339,7 @@ class Engine:
         previous = self.session_last
         if (
             previous
-            and (tick.timestamp - previous.timestamp).total_seconds()
+            and self.gap_seconds(previous.timestamp, tick.timestamp, session)
             > self.config.max_tick_gap_seconds
         ):
             self.fault(tick, "DATA_GAP")
@@ -368,7 +397,7 @@ class Engine:
             )
             # Stop wins a same-tick collision; different ticks preserve observed order.
             if pos.direction * (executable - pos.stop) <= 0:
-                if self.config.strategy != "R1":
+                if not self.rolling:
                     self.blocked = True
                 self._exit(tick, "EMERGENCY_STOP")
             elif (
@@ -376,16 +405,14 @@ class Engine:
                 and pos.direction * (executable - pos.target) >= 0
             ):
                 self._exit(tick, "TARGET_EXIT")
-            elif tick.timestamp >= session.at(
-                15, 59 if self.config.strategy == "P0" else 55
-            ):
-                self._exit(tick, "TIME_EXIT")
-            elif self.config.strategy == "R1" and session.news_paused(tick.timestamp):
+            elif tick.timestamp >= self.flatten_time():
+                self._exit(tick, self.scheduled_exit_reason())
+            elif self.rolling and session.news_paused(tick.timestamp):
                 self._exit(tick, "NEWS_EXIT")
             elif (
-                self.config.strategy == "R1"
+                self.rolling
                 and tick.timestamp
-                >= datetime.fromisoformat(pos.entry_time) + timedelta(minutes=30)
+                >= datetime.fromisoformat(pos.entry_time) + timedelta(minutes=(self.entry_rules or {}).get("hold_minutes", 30))
             ):
                 self._exit(tick, "HOLD_EXIT")
             elif (
@@ -435,7 +462,7 @@ class Engine:
             return
         if self.blocked or self.attempted:
             return
-        if self.config.strategy == "R1" and session.news_paused(tick.timestamp):
+        if self.rolling and session.news_paused(tick.timestamp):
             if self.rolling_signal:
                 self.attempted = True
                 self.log(tick, "risk", "NEWS_PAUSE")
@@ -453,12 +480,12 @@ class Engine:
                 15, 59
             ):
                 self._enter(tick, self.direction, previous)
-        elif self.config.strategy == "R1":
+        elif self.rolling:
             candidate = self.rolling_signal
             if (
                 candidate
                 and candidate.formed <= tick.timestamp < candidate.expires
-                and tick.timestamp < session.at(15, 55)
+                and tick.timestamp < self.flatten_time()
             ):
                 self._enter(tick, candidate.direction, previous, candidate.stop)
         elif self.setup:
@@ -477,12 +504,16 @@ class Engine:
 
     def _enter(self, tick, direction, previous, c1_stop=None):
         self.attempted = True
+        if self.config.strategy == "R2" and (tick.bid is None or tick.ask is None
+                or (tick.ask - tick.bid) / TICK > self.config.full_session_max_spread_ticks):
+            self.log(tick, "order", "REJECTED", detail="R2_QUOTE_OR_SPREAD_FILTER")
+            return
         fill, reference = self.broker.quote(tick, direction)
         trigger = previous.price if previous else reference
         if c1_stop is not None:
             trigger = (
                 self.rolling_signal.reference
-                if self.config.strategy == "R1"
+                if self.rolling
                 else self.setup.midpoint
             )
         adverse = max(0, direction * (fill - trigger) / TICK)
@@ -508,12 +539,12 @@ class Engine:
         )
         if (
             risk_ticks <= 0
-            or self.config.strategy == "R1"
-            and risk_ticks * TICK > 0.20 * self.atr
+            or self.rolling
+            and risk_ticks * TICK > (self.entry_rules or {}).get("stop_atr", 0.20) * self.atr
             or c1_stop is not None
             and risk_ticks < 2 * actual_cost_floor
         ):
-            self.blocked = self.config.strategy != "R1"
+            self.blocked = not self.rolling
             self.log(tick, "order", "REJECTED", detail="INITIAL_RISK_BELOW_COST_FLOOR")
             return
         if (
@@ -522,7 +553,7 @@ class Engine:
             + self.config.slippage_ticks_per_side * TICK_VALUE
             > self.config.session_loss_budget_usd + min(0, self.day_realized)
         ):
-            self.blocked = self.config.strategy != "R1"
+            self.blocked = not self.rolling
             self.log(
                 tick,
                 "order",
@@ -535,14 +566,14 @@ class Engine:
             self.config.break_even_trigger_r
             and self.config.break_even_trigger_r * risk_ticks <= actual_cost_floor
         ):
-            self.blocked = self.config.strategy != "R1"
+            self.blocked = not self.rolling
             self.log(tick, "order", "REJECTED", detail="BREAK_EVEN_TRIGGER_BELOW_COSTS")
             return
         target = None
         if c1_stop is not None:
             # Round target away from fill; avoid an optimistic sub-tick target.
             target = round_outward(
-                fill + direction * 1.5 * risk_ticks * TICK, -direction
+                fill + direction * (self.entry_rules or {}).get("target_r", 1.5) * risk_ticks * TICK, -direction
             )
         self.trade_sequence += 1
         oid = f"{self.session.day}:{self.config.strategy}:entry:{self.trade_sequence}"
@@ -590,7 +621,10 @@ class Engine:
             if self.rolling_signal
             else None,
         }
-        self.audit_last_tick = (tick.contract, tick.tick_id)
+        self.audit_last_tick = (contract_key(tick.contract), tick.tick_id)
+        if self.config.strategy == "R2":
+            self.audit["full_session_rules"] = self.entry_rules
+            self.audit["futures_day"] = str(self.session.day)
         self.log(
             tick,
             "order",
@@ -639,11 +673,12 @@ class Engine:
                 net_ticks=trade.net_ticks,
             )
         if (
-            self.config.strategy == "R1"
+            self.rolling
             and not self.quality_fault
             and reason != "FAULT_EXIT"
         ):
-            self.learner.record(
+            learner = self.quality_learner(datetime.fromisoformat(trade.entry_time))
+            learner.record(
                 self.active_order_id,
                 tick.timestamp,
                 trade.direction,
@@ -653,18 +688,19 @@ class Engine:
                 tick,
                 "learning",
                 "ADAPTATION_UPDATE",
-                **self.learner.state(
+                regime=(self.entry_rules or {}).get("regime", "RTH"),
+                **learner.state(
                     trade.direction, tick.timestamp + timedelta(microseconds=1)
                 ),
             )
-        elif self.config.strategy == "R1":
+        elif self.rolling:
             self.log(
                 tick,
                 "learning",
                 "QUALITY_SAMPLE_EXCLUDED",
                 detail="Data/order faults count toward risk, but do not train the entry filter",
             )
-        if self.config.strategy == "R1":
+        if self.rolling:
             self.rolling_signal = None
         if (
             self.day_realized <= -self.config.session_loss_budget_usd
@@ -678,7 +714,7 @@ class Engine:
 
     def _mark_audit(self, tick):
         if self.audit and self.broker.position:
-            key = (tick.contract, tick.tick_id)
+            key = (contract_key(tick.contract), tick.tick_id)
             if key == self.audit_last_tick:
                 return
             self.audit_last_tick = key
