@@ -38,6 +38,14 @@ class Session:
     roll_day: bool
     news_flags: tuple[str, ...]
     releases: tuple[datetime, ...]
+    trade_enabled: bool = True
+
+    @property
+    def late_news(self):
+        return any(
+            time(15, 25) <= t.timetz().replace(tzinfo=None) <= time(16)
+            for t in self.releases
+        )
 
     @property
     def eligibility(self):
@@ -47,11 +55,10 @@ class Session:
             return "ROLL_DAY"
         if not self.contract:
             return "UNRESOLVED_CONTRACT"
-        if any(
-            time(15, 25) <= t.timetz().replace(tzinfo=None) <= time(16)
-            for t in self.releases
-        ):
+        if self.late_news:
             return "NEWS_WINDOW"
+        if not self.trade_enabled:
+            return "WARMUP_ONLY"
         return "ELIGIBLE"
 
     def at(self, hour, minute):
@@ -93,6 +100,8 @@ class Calendar:
                 raise ValueError(
                     "Explicit contract mapping and boolean roll_day required"
                 )
+            if not isinstance(row.get("trade_enabled", True), bool):
+                raise ValueError("trade_enabled must be a boolean")
             news = row["news"]
             if not isinstance(news["flags"], list) or not isinstance(
                 news["releases"], list
@@ -116,6 +125,7 @@ class Calendar:
                 row["roll_day"],
                 tuple(news["flags"]),
                 tuple(releases),
+                row.get("trade_enabled", True),
             )
         if not self.sessions:
             raise ValueError("Calendar contains no sessions")

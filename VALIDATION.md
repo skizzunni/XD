@@ -6,7 +6,7 @@ available here; native compilation/playback and profitability are unverified.
 
 ## Checks completed
 
-- 40 automated tests: signal thresholds/freeze, ATR lag, Eastern/DST, early closes,
+- 54 automated tests: signal thresholds/freeze, ATR lag, Eastern/DST, early closes,
   rollover, news, bad/duplicate data, slippage caps, quote cost invariants,
   stop/time/target tick ordering, recovery reconstruction, unresolved-position
   preservation, account stages, net break-even/gap loss, research freeze/holdout
@@ -40,6 +40,16 @@ available here; native compilation/playback and profitability are unverified.
   stale-feed detection, and explicit reconciliation of pre-existing positions.
 - Buffered native tick exports and preserved prior files instead of duplicating
   history on a restart.
+- Added warmup-only calendar dates without discarding their ATR history; verified
+  that scheduled late news remains in CSV exports even when a roll/early-close
+  reason takes precedence. Legacy native CSV headers remain supported in source.
+- Added current Sim101 and requested playback calendars with official-source
+  snapshots; checked reproducible CSV exports and synthetic scheduling for the
+  requested playback dates. Real price data has not been downloaded here.
+- Added a folder-independent Windows launcher. Python tests verify backup
+  preservation, repeat installation, rejection of changed calendar bodies,
+  failed-copy recovery and dashboard loading from a Sim101 ledger. Windows
+  Known Folder calls, the CMD launcher and NinjaTrader remain unrun on Windows.
 - Added verified Windows timezone support; escaped dashboard payloads and handled
   incomplete appended CSV rows.
 

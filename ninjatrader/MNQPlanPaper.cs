@@ -26,6 +26,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             public TimeSpan Open, Close;
             public string Contract, NewsFlags;
             public bool Roll, LateNews;
+            public bool TradeEnabled = true;
         }
         private class Candle
         {
@@ -269,7 +270,9 @@ namespace NinjaTrader.NinjaScript.Strategies
                 throw new InvalidOperationException("Use export-nt-calendar with a real reviewed session/news/roll calendar.");
             using (SHA256 sha = SHA256.Create())
                 calendarHash = BitConverter.ToString(sha.ComputeHash(File.ReadAllBytes(path))).Replace("-", "").ToLowerInvariant();
-            if (lines[1] != "date,open_et,close_et,contract,roll_day,late_news,news_flags")
+            const string legacyHeader = "date,open_et,close_et,contract,roll_day,late_news,news_flags";
+            bool hasTradeEnabled = lines[1] == legacyHeader + ",trade_enabled";
+            if (!hasTradeEnabled && lines[1] != legacyHeader)
                 throw new InvalidOperationException("Unexpected calendar header.");
             var result = new Dictionary<DateTime, SessionRule>();
             foreach (string line in lines.Skip(2))
@@ -277,10 +280,11 @@ namespace NinjaTrader.NinjaScript.Strategies
                 if (String.IsNullOrWhiteSpace(line)) continue;
                 // Contract identifiers and flags must not contain comma/quote characters.
                 string[] parts = line.Split(',');
-                if (parts.Length != 7) throw new InvalidOperationException("Invalid calendar row: " + line);
+                if (parts.Length != (hasTradeEnabled ? 8 : 7)) throw new InvalidOperationException("Invalid calendar row: " + line);
                 var rule = new SessionRule { Day = DateTime.ParseExact(parts[0], "yyyy-MM-dd", CultureInfo.InvariantCulture),
                     Open = TimeSpan.Parse(parts[1], CultureInfo.InvariantCulture), Close = TimeSpan.Parse(parts[2], CultureInfo.InvariantCulture),
-                    Contract = parts[3], Roll = Boolean.Parse(parts[4]), LateNews = Boolean.Parse(parts[5]), NewsFlags = parts[6] };
+                    Contract = parts[3], Roll = Boolean.Parse(parts[4]), LateNews = Boolean.Parse(parts[5]), NewsFlags = parts[6],
+                    TradeEnabled = !hasTradeEnabled || Boolean.Parse(parts[7]) };
                 if (rule.Day.DayOfWeek == DayOfWeek.Saturday || rule.Day.DayOfWeek == DayOfWeek.Sunday
                     || rule.Open != new TimeSpan(9,30,0) || rule.Close <= rule.Open || rule.Close > new TimeSpan(16,0,0))
                     throw new InvalidOperationException("Invalid calendar date/session.");
@@ -310,6 +314,7 @@ namespace NinjaTrader.NinjaScript.Strategies
             else if (session.Roll) { reason = "ROLL_DAY"; blocked = true; }
             else if (session.Contract != Instrument.FullName) { reason = "UNRESOLVED_CONTRACT"; blocked = true; }
             else if (session.LateNews) { reason = "NEWS_WINDOW"; blocked = true; }
+            else if (!session.TradeEnabled) { reason = "WARMUP_ONLY"; blocked = true; }
             if (atr <= 0) blocked = true;
             if (State == State.Realtime && OtherAccountPosition()) blocked = true;
             Log(et, reason, "atr20=" + F(atr) + ";contract=" + Instrument.FullName);

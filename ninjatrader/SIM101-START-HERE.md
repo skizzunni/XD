@@ -1,0 +1,110 @@
+# Watch MNQ trade current market prices on Sim101
+
+The errors in your screenshot came from running project commands at
+`C:\Users\skyma`, where `requirements.txt` and `ninjatrader` do not exist.
+The launcher below changes to its own extracted project folder automatically.
+Your installed Python 3.14 satisfies the dashboard's Python 3.12+ requirement.
+The pip upgrade notice does not require action.
+
+## Install and open the dashboard
+
+1. Download the updated GitHub ZIP. Right-click it → **Extract All**. Open the
+   extracted `XD-...` folder containing `requirements.txt` and `START-SIM101.cmd`.
+   Work from the extracted folder, not the ZIP preview.
+2. In NinjaTrader, disable any existing `MNQPlanPaper` instance before updating.
+   Stop your friend's MNQ strategy on Sim101 and reconcile any existing MNQ
+   position before testing this strategy on that account.
+3. Double-click **START-SIM101.cmd**. It installs the pinned dashboard dependency,
+   copies the updated strategy and current calendar into your actual NinjaTrader
+   Documents folder, and starts the dashboard watcher. Different existing files
+   are backed up under `NinjaTrader 8\MNQPaper\install-backups\...`.
+   Leave this window open. It will say **Waiting for strategy logs** until the
+   strategy is enabled with the matching run ID. The watcher does not place orders.
+4. In NinjaTrader choose **New → NinjaScript Editor**, then press **F5**. If
+   compilation fails, keep the strategy disabled and send the full error table.
+   Native compilation has not been run in the cloud.
+
+If the launcher cannot find NinjaTrader because you use a custom user-data
+directory, open PowerShell **inside the extracted project folder** and run:
+
+```powershell
+python windows_setup.py --ninjatrader-home 'D:\your actual NinjaTrader 8 folder' install
+python windows_setup.py --ninjatrader-home 'D:\your actual NinjaTrader 8 folder' dashboard --run-id p0-sim101-001
+```
+
+The Python launcher avoids requiring execution of a PowerShell script. It does
+not change Windows execution policy, and it does not connect or enable NinjaTrader.
+
+## Connect the current market and configure the strategy
+
+1. Use NinjaTrader's **Connections** menu to connect your working market-data
+   provider for current CME MNQ quotes and historical ticks. The **Simulated Data
+   Feed** generates artificial prices; select your actual market-data connection
+   for this test. A paid/data-enabled connection may be required by your provider.
+   Leave Playback disconnected for this current-market test.
+2. Set **Tools → Options → General → Time zone** to Eastern Time. The strategy
+   property **Platform display time zone ID** must remain `Eastern Standard Time`.
+3. Set **Tools → Options → Market data → Merge policy** to **DoNotMerge** for
+   the individual December contract. Choose **New → Chart**, select
+   **MNQ 12-26** (MNQ DEC26), and select
+   **Type=Minute, Value=5**. In Data Series load at least **60 calendar days** of
+   data and use a trading-hours template covering the entire 09:30–16:00 ET
+   cash session. The added one-tick series needs actual historical ticks too.
+4. If tick history is missing, use **Tools → Historical Data → Load → Download**:
+   select **MNQ 12-26**, date range **August 24–October 6, 2026**, interval
+   **Tick**, and **Last** data, then download through your connected provider.
+   Reload the chart after the download. Provider retention and entitlement vary;
+   five-minute bars do not replace the required tick history. Check the
+   [official download guide](https://ninjatrader.com/support/helpguides/nt8/download.htm).
+5. Right-click the chart → **Strategies** → add **MNQPlanPaper**:
+
+   | Property | Value |
+   | --- | --- |
+   | Account | **Sim101** |
+   | Strategy arm | **P0** |
+   | Account stage | **Funded** |
+   | Paper run ID | **p0-sim101-001** |
+   | Frozen calendar CSV | Your actual `Documents\NinjaTrader 8\MNQCalendar.csv` (installed by the launcher) |
+   | Allow historical orders | **False** |
+   | Use break-even protection | **True** |
+   | Session loss limit | **100** provisional; set your chosen simulation risk |
+   | Round-trip fees | Replace provisional **$1.00** with your actual per-contract fee |
+   | Enabled | Set **True** after compile and history checks |
+
+   Keep the other initial thresholds. `Funded` removes the daily profit target;
+   risk limits still apply. This setting describes the simulated profile.
+6. Open **New → NinjaScript Output** and check Control Center **Log**. The current
+   calendar enables **October 7–9, 2026 only**. Earlier dates build ATR and cannot
+   open trades. `ATR_WARMUP` means insufficient valid completed history;
+   `DATA_GAP` means the history/feed failed validation. Resolve those before
+   expecting entries. Dates after October 9 require an updated reviewed calendar.
+
+P0 uses the first six closed cash-session five-minute bars to decide direction,
+tries an eligible entry at **15:30 ET**, and exits at **15:59 ET** or sooner on a
+stop/risk event. A below-threshold signal can produce no trade. Enable before
+09:30 ET for an uninterrupted first observed session; enabling partway through
+the session can block entries when complete required tick history is missing.
+Keep NinjaTrader running and the connection healthy for its simulation orders.
+
+## Read the dashboard and assess results
+
+The launcher opens the dashboard when native event logs exist. The watcher reads
+logs every five seconds; the browser page refreshes every fifteen seconds. A
+page without completed trades can still show events explaining why the strategy
+is waiting or blocked. Keep **Paper run ID** identical in the strategy and
+watcher. Existing nonempty tick logs require a fresh run ID on a restart, e.g.
+`p0-sim101-002`; run `python windows_setup.py dashboard --run-id p0-sim101-002`
+to watch it. Session entry locks remain in place across run IDs.
+
+Orders/fills are visible immediately in Control Center **Orders/Executions**.
+Completed trades appear in the dashboard with estimated fee-adjusted P&L,
+drawdown, account stage and loss diagnostics. Reconcile the ledger with
+NinjaTrader **Trade Performance**, including its actual commission template.
+The dashboard is the bot's ledger; it does not independently query the account.
+
+Use at least 30 clean eligible forward simulation sessions, calibrated costs,
+drawdown and repeated losing periods to assess the bot. A short winning run does
+not establish readiness for a funded account. Firm-specific trailing drawdown
+and consistency rules still need to be supplied and modeled before that decision.
+
+Source-calendar provenance and limitations are in [calendars/README.md](calendars/README.md).

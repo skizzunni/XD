@@ -127,7 +127,7 @@ def main(argv=None):
             f.write(
                 f"# frozen_sha256={checksum(args.calendar)}; synthetic={str(calendar.synthetic).lower()}; source={Path(args.calendar).name}\n"
             )
-            writer = csv.writer(f)
+            writer = csv.writer(f, lineterminator="\n")
             writer.writerow(
                 [
                     "date",
@@ -137,6 +137,7 @@ def main(argv=None):
                     "roll_day",
                     "late_news",
                     "news_flags",
+                    "trade_enabled",
                 ]
             )
             for _, session in sorted(calendar.sessions.items()):
@@ -147,8 +148,9 @@ def main(argv=None):
                         session.close.strftime("%H:%M"),
                         session.contract,
                         str(session.roll_day).lower(),
-                        str(session.eligibility == "NEWS_WINDOW").lower(),
+                        str(session.late_news).lower(),
                         "|".join(session.news_flags),
+                        str(session.trade_enabled).lower(),
                     ]
                 )
         print(f"Frozen NinjaTrader calendar written to {output}")

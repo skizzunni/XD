@@ -10,6 +10,12 @@ NinjaTrader strategy is delivered as source and still requires native Windows
 compilation, a real calendar, data, and playback acceptance. Synthetic results
 are implementation checks, never evidence of profitable trading.
 
+On Windows, start with [the Sim101 current-market guide](ninjatrader/SIM101-START-HERE.md).
+Extract the ZIP and double-click **START-SIM101.cmd**. It installs the dependency,
+backs up older strategy/calendar files, installs the current dated calendar, and
+opens a local dashboard when NinjaTrader produces logs. You compile with F5,
+connect your market-data feed and enable the strategy on Sim101.
+
 ## Run locally
 
 ```bash
@@ -86,6 +92,11 @@ example is intentionally synthetic and is blocked by the native strategy.
 Confirm the exchange calendar and macro calendar; do not infer holidays from
 weekdays. Keep earlier-release days but flag them; exclude 15:25–16:00 releases.
 Provide at least 20 completed prior sessions plus the selected trading sessions.
+Optional boolean `trade_enabled` defaults to true; false marks dates as ATR
+warmup only. [Ready dated calendars](ninjatrader/calendars/README.md) cover the
+requested October 5–6 playback and October 7–9 Sim101 forward test, with cited
+official schedule snapshots. Those snapshots do not provide tick prices or
+complete historical news revision records.
 
 ```bash
 python main.py --config config.json replay --ticks data/ticks.csv --calendar data/calendar.json --out runs/baseline

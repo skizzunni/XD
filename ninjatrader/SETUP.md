@@ -5,6 +5,12 @@ installed NinjaTrader assemblies. C# syntax is checked in cloud; native compile,
 order lifecycle, connection handling, and playback tests are still required.
 The strategy is not yet deployed to your PC.
 
+For **Sim101 on current market data**, follow [SIM101-START-HERE.md](SIM101-START-HERE.md)
+and double-click `START-SIM101.cmd` from the extracted project. The launcher
+locates its own files and installs the dated October 7–9 calendar. It preserves
+older files in backups and opens the dashboard when logs exist. Compilation and
+enabling still happen in NinjaTrader.
+
 1. Download and unzip the delivered `mnq-paper-bot.zip` on your Windows PC.
    Install Python 3.12+ for the dashboard and open NinjaTrader 8 once.
    In PowerShell inside the unzipped project run
@@ -21,6 +27,12 @@ The strategy is not yet deployed to your PC.
    individual-contract history, not an unexamined back-adjusted continuous series.
    The included example is a schema, not a real calendar; native activation rejects
    synthetic calendars. Convert your verified JSON on the PC or in this cloud:
+
+   For the requested **MNQ December 2026, October 5–6 playback**, a ready CSV is
+   included at `calendars\mnq-dec26-2026-10-05-06\MNQCalendar.csv`. Copy it to the
+   location below after installing and compiling the updated strategy; you do
+   not need to author or export that file yourself. Earlier included dates are
+   warmup only. See [calendar sources and scope](calendars/README.md).
 
    ```powershell
    python main.py export-nt-calendar --calendar data\calendar.json --out MNQCalendar.csv
