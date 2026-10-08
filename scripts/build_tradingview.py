@@ -10,6 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 CALENDAR = ROOT / "ninjatrader/calendars/mnq-dec26-full-session-2026-10-07-30/calendar.json"
 TEMPLATE = ROOT / "tradingview/MNQ_R2_Paper.template.pine"
 OUTPUT = ROOT / "tradingview/MNQ_R2_Paper.pine"
+GUARDED_OUTPUT = ROOT / "tradingview/MNQ_R2_Guarded.pine"
 
 
 def milliseconds(value):
@@ -32,7 +33,9 @@ def questions():
     return result
 
 
-def render():
+def render(variant="baseline"):
+    if variant not in {"baseline", "guarded"}:
+        raise ValueError("Unknown Pine experiment variant")
     raw = CALENDAR.read_bytes()
     calendar = json.loads(raw)
     if calendar.get("synthetic") or len(calendar["sessions"]) != 49:
@@ -54,7 +57,9 @@ def render():
         for start, end in row["globex"]["breaks"]:
             data["breakStart"].append(milliseconds(start))
             data["breakEnd"].append(milliseconds(end))
-    lines = ["// Reviewed calendar SHA256: " + hashlib.sha256(raw).hexdigest()]
+    digest = hashlib.sha256(raw).hexdigest()
+    lines = ["// Reviewed calendar SHA256: " + digest,
+             'const string calendarHash = "' + digest + '"']
     for key, values in data.items():
         kind = "bool" if key == "enabled" else "int"
         contents = ", ".join(str(v).lower() for v in values)
@@ -66,9 +71,19 @@ def render():
     template = TEMPLATE.read_text()
     if template.count("// @GENERATED_CALENDAR@") != 1:
         raise ValueError("Exactly one calendar placeholder required")
-    return template.replace("// @GENERATED_CALENDAR@", "\n".join(lines))
+    result = template.replace("// @GENERATED_CALENDAR@", "\n".join(lines))
+    if variant == "guarded":
+        title = 'strategy("MNQ R2 Paper Research",'
+        default = 'input.string("Baseline R2", "Paper test variant"'
+        if result.count(title) != 1 or result.count(default) != 1:
+            raise ValueError("Pine variant declaration mismatch")
+        result = result.replace(title, 'strategy("MNQ R2 Guarded Paper Test",', 1)
+        result = result.replace(default, 'input.string("Guarded R2", "Paper test variant"', 1)
+    return result
 
 
 if __name__ == "__main__":
     OUTPUT.write_text(render(), encoding="utf-8")
+    GUARDED_OUTPUT.write_text(render("guarded"), encoding="utf-8")
     print(f"Rendered {OUTPUT.relative_to(ROOT)}")
+    print(f"Rendered {GUARDED_OUTPUT.relative_to(ROOT)}")

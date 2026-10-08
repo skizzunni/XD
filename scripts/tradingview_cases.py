@@ -58,7 +58,14 @@ def cases():
         atr, minimum, max_stop = rng.choice([60, 100, 150, 200]), rng.choice([.4, .55, .7]), rng.choice([.1, .2])
         result = rolling_setup(bars, session, atr, min_efficiency=minimum, entry_start=bars[0].start-timedelta(days=1), entry_end=bars[-1].end+timedelta(days=1), max_stop_atr=max_stop)
         setup.append({"bars": [{"openTime": int(b.start.timestamp()*1000), "closeTime": int(b.end.timestamp()*1000), "open": b.open, "high": b.high, "low": b.low, "close": b.close, "volume": case} for b in bars], "atr": atr, "minimum": minimum, "max_stop": max_stop, "direction": result.direction if result else 0, "stop": result.stop if result else None})
-    return {"size": size, "fit": fit, "runner": runner, "setup": setup}
+    allowance = []
+    for _ in range(1000):
+        budget, pnl = rng.uniform(1, 1000), rng.uniform(-1100, 1000)
+        capped, cap = rng.choice([True, False]), rng.uniform(1, 1000)
+        remaining = max(0, budget + min(0, pnl))
+        allowance.append({"budget": budget, "pnl": pnl, "capped": capped, "cap": cap,
+                          "expected": min(remaining, cap) if capped else remaining})
+    return {"size": size, "fit": fit, "runner": runner, "setup": setup, "allowance": allowance}
 
 
 if __name__ == "__main__":

@@ -1,7 +1,7 @@
 //@version=6
 // Generated release: MNQ_R2_Paper.pine. Edit this template, then run scripts/build_tradingview.py.
 // Strategy Tester simulation only. Chart bars cannot establish broker execution quality.
-strategy("MNQ R2 Paper Research", overlay = true, initial_capital = 25000, currency = currency.USD, default_qty_type = strategy.fixed, default_qty_value = 2, pyramiding = 0, commission_type = strategy.commission.cash_per_contract, commission_value = 0.75, slippage = 1, margin_long = 1, margin_short = 1, calc_on_every_tick = true, calc_on_order_fills = false, process_orders_on_close = false, max_bars_back = 500)
+strategy("MNQ R2 Guarded Paper Test", overlay = true, initial_capital = 25000, currency = currency.USD, default_qty_type = strategy.fixed, default_qty_value = 2, pyramiding = 0, commission_type = strategy.commission.cash_per_contract, commission_value = 0.75, slippage = 1, margin_long = 1, margin_short = 1, calc_on_every_tick = true, calc_on_order_fills = false, process_orders_on_close = false, max_bars_back = 500)
 
 const string TZ = "America/New_York"
 const float TICK = 0.25
@@ -15,7 +15,7 @@ paperStart = input.time(timestamp("07 Oct 2026 00:00 -0400"), "Paper experiment 
 feedLabel = input.string("Delayed research", "Chart data entitlement (label only)", options = ["Delayed research", "Real-time research"], group = "Account")
 startQty = input.int(2, "Starting MNQ contracts", minval = 1, maxval = 10, group = "Sizing")
 maxQty = input.int(10, "Maximum MNQ contracts", minval = 1, maxval = 10, group = "Sizing")
-studyMode = input.string("Baseline R2", "Paper test variant", options = ["Baseline R2", "Trade risk cap only", "Cash open guard only", "Guarded R2"], group = "Paper experiment")
+studyMode = input.string("Guarded R2", "Paper test variant", options = ["Baseline R2", "Trade risk cap only", "Cash open guard only", "Guarded R2"], group = "Paper experiment")
 tradeCap = input.float(25, "Maximum planned loss per new position ($)", minval = 1, group = "Paper experiment")
 openBefore = input.int(5, "Cash-open buffer before (minutes)", minval = 0, maxval = 30, group = "Paper experiment")
 openAfter = input.int(10, "Cash-open buffer after (minutes)", minval = 0, maxval = 30, group = "Paper experiment")

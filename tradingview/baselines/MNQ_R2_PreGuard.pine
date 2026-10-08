@@ -7,7 +7,6 @@ const string TZ = "America/New_York"
 const float TICK = 0.25
 const float POINT = 2.0
 const int MINUTE = 60000
-const string AUDIT_VERSION = "R2_TV_GUARDS_V1"
 stage = input.string("Funded", "Account stage", options = ["Funded", "Evaluation"], group = "Account")
 lossBudget = input.float(100, "Session loss budget ($)", minval = 1, group = "Account")
 evalTarget = input.float(750, "Evaluation session profit target ($)", minval = 1, group = "Account")
@@ -15,12 +14,6 @@ paperStart = input.time(timestamp("07 Oct 2026 00:00 -0400"), "Paper experiment 
 feedLabel = input.string("Delayed research", "Chart data entitlement (label only)", options = ["Delayed research", "Real-time research"], group = "Account")
 startQty = input.int(2, "Starting MNQ contracts", minval = 1, maxval = 10, group = "Sizing")
 maxQty = input.int(10, "Maximum MNQ contracts", minval = 1, maxval = 10, group = "Sizing")
-studyMode = input.string("Baseline R2", "Paper test variant", options = ["Baseline R2", "Trade risk cap only", "Cash open guard only", "Guarded R2"], group = "Paper experiment")
-tradeCap = input.float(25, "Maximum planned loss per new position ($)", minval = 1, group = "Paper experiment")
-openBefore = input.int(5, "Cash-open buffer before (minutes)", minval = 0, maxval = 30, group = "Paper experiment")
-openAfter = input.int(10, "Cash-open buffer after (minutes)", minval = 0, maxval = 30, group = "Paper experiment")
-bool capEnabled = studyMode == "Trade risk cap only" or studyMode == "Guarded R2"
-bool openGuardEnabled = studyMode == "Cash open guard only" or studyMode == "Guarded R2"
 adaptiveSize = input.bool(true, "Adaptive paper sizing", group = "Sizing")
 adaptiveQuality = input.bool(true, "Learn quality from completed trades", group = "Sizing")
 feesRT = input.float(1.50, "Round-trip fees per contract ($): match Properties", minval = 0, group = "Execution model")
@@ -33,10 +26,8 @@ reviewVisible = input.bool(true, "Show loss review", group = "Dashboard")
 reviewPage = input.int(1, "Loss review page (1–3)", minval = 1, maxval = 3, group = "Dashboard")
 reviewBack = input.int(1, "Loss to review (1 = newest, up to 20)", minval = 1, maxval = 20, group = "Dashboard")
 lossLogs = input.bool(true, "Write 30 answers to Pine Logs on each loss", group = "Dashboard")
-auditLogs = input.bool(true, "Write entry plans and every completed trade to Pine Logs", group = "Dashboard")
 
 // Reviewed calendar SHA256: d44212925351b30d34d0a370c0ad4fd269ad88ee9bcfcb055a3e4a7b78823fc0
-const string calendarHash = "d44212925351b30d34d0a370c0ad4fd269ad88ee9bcfcb055a3e4a7b78823fc0"
 var array<int> calDay = array.from(1787544000000, 1787630400000, 1787716800000, 1787803200000, 1787889600000, 1788148800000, 1788235200000, 1788321600000, 1788408000000, 1788494400000, 1788840000000, 1788926400000, 1789012800000, 1789099200000, 1789358400000, 1789444800000, 1789531200000, 1789617600000, 1789704000000, 1789963200000, 1790049600000, 1790136000000, 1790222400000, 1790308800000, 1790568000000, 1790654400000, 1790740800000, 1790827200000, 1790913600000, 1791172800000, 1791259200000, 1791345600000, 1791432000000, 1791518400000, 1791777600000, 1791864000000, 1791950400000, 1792036800000, 1792123200000, 1792382400000, 1792468800000, 1792555200000, 1792641600000, 1792728000000, 1792987200000, 1793073600000, 1793160000000, 1793246400000, 1793332800000)
 var array<int> cashOpen = array.from(1787578200000, 1787664600000, 1787751000000, 1787837400000, 1787923800000, 1788183000000, 1788269400000, 1788355800000, 1788442200000, 1788528600000, 1788874200000, 1788960600000, 1789047000000, 1789133400000, 1789392600000, 1789479000000, 1789565400000, 1789651800000, 1789738200000, 1789997400000, 1790083800000, 1790170200000, 1790256600000, 1790343000000, 1790602200000, 1790688600000, 1790775000000, 1790861400000, 1790947800000, 1791207000000, 1791293400000, 1791379800000, 1791466200000, 1791552600000, 1791811800000, 1791898200000, 1791984600000, 1792071000000, 1792157400000, 1792416600000, 1792503000000, 1792589400000, 1792675800000, 1792762200000, 1793021400000, 1793107800000, 1793194200000, 1793280600000, 1793367000000)
 var array<int> cashClose = array.from(1787601600000, 1787688000000, 1787774400000, 1787860800000, 1787947200000, 1788206400000, 1788292800000, 1788379200000, 1788465600000, 1788552000000, 1788897600000, 1788984000000, 1789070400000, 1789156800000, 1789416000000, 1789502400000, 1789588800000, 1789675200000, 1789761600000, 1790020800000, 1790107200000, 1790193600000, 1790280000000, 1790366400000, 1790625600000, 1790712000000, 1790798400000, 1790884800000, 1790971200000, 1791230400000, 1791316800000, 1791403200000, 1791489600000, 1791576000000, 1791835200000, 1791921600000, 1792008000000, 1792094400000, 1792180800000, 1792440000000, 1792526400000, 1792612800000, 1792699200000, 1792785600000, 1793044800000, 1793131200000, 1793217600000, 1793304000000, 1793390400000)
@@ -61,13 +52,6 @@ f_fit(int suggested, float reservation, float remaining) =>
     while quantity > 0 and quantity * reservation > remaining
         quantity -= 1
     quantity
-
-f_allowance(float sessionBudget, float sessionResult, bool capped, float perTradeCap) =>
-    float remaining = math.max(0, sessionBudget + math.min(0, sessionResult))
-    capped ? math.min(remaining, perTradeCap) : remaining
-
-f_overlap(int start, int finish, int guardStart, int guardEnd) =>
-    start < guardEnd and finish > guardStart
 
 f_window_stats(array<float> recent) =>
     float net = 0
@@ -226,8 +210,6 @@ bool chartOK = timeframe.isminutes and timeframe.multiplier == 5 and chart.is_st
 bool inputsOK = startQty <= maxQty
 bool marketAllowed = false
 bool newsPause = false
-bool openPause = false
-bool openEntryPause = false
 int flattenAt = na
 int enterUntil = na
 if row >= 0
@@ -246,14 +228,6 @@ if row >= 0
             if time_close >= a and time_close < b
                 marketAllowed := false
     marketAllowed := marketAllowed and time_close <= enterUntil
-    if openGuardEnabled
-        int opening = array.get(cashOpen, row)
-        int guardStart = opening - openBefore * MINUTE
-        int guardEnd = opening + openAfter * MINUTE
-        // Flatten at the first confirmed close reaching the buffer start.
-        openPause := guardStart < guardEnd and time_close >= guardStart and time < guardEnd
-        // A pending entry lasts through the next bar: avoid any overlapping fill window.
-        openEntryPause := guardStart < guardEnd and f_overlap(time, time_close + 5 * MINUTE, guardStart, guardEnd)
 for i = 0 to array.size(newsStart) - 1
     // Block bars overlapping a news pause and entries whose next fill bar would cross it.
     int a = array.get(newsStart, i)
@@ -290,17 +264,10 @@ var float entryAtr = na
 var float entryEfficiency = na
 var float entryThreshold = na
 var float entryReservation = na
-var float entryAllowance = na
-var int entryRiskDay = na
-var int entryPlanTime = na
 var float positionRisk = na
 var float peakPrice = na
 var bool breakEvenArmed = false
 var string decision = "WAITING_FOR_BAR"
-var int riskRejects = 0
-var int openGuardBars = 0
-var string lastAudit = "No completed positions"
-var int loadedFirstTime = time
 
 array<float> qualityLong = profile == 0 ? dayLong : nightLong
 array<float> qualityShort = profile == 0 ? dayShort : nightShort
@@ -312,8 +279,6 @@ float minEfficiency = change >= 0 ? longEfficiency : shortEfficiency
 [signal, signalStop, setupEfficiency, setupMomentum] = f_setup(atr, minEfficiency, cashRegime ? 0.20 : 0.10)
 
 if barstate.isconfirmed
-    if openEntryPause and time_close >= paperStart
-        openGuardBars += 1
     if na(activeRiskDay) or riskDay != activeRiskDay
         activeRiskDay := riskDay
         sessionNet := 0
@@ -330,15 +295,6 @@ if barstate.isconfirmed
             bool eligible = originalRisk > 0 and quantity == plannedQty and math.abs(commission - feesRT * quantity) < 0.00001 and positionDirection * (fill - reference) / TICK <= chaseTicks + 0.00001 and quantity * (originalRisk / math.max(1, quantity) + feesRT + exitSlip * TICK * POINT) <= entryReservation + 0.00001
             if f_futures_day(strategy.closedtrades.exit_time(trade)) == riskDay
                 sessionNet += net
-            string exitReason = strategy.closedtrades.exit_comment(trade)
-            float runup = strategy.closedtrades.max_runup(trade)
-            float drawdown = strategy.closedtrades.max_drawdown(trade)
-            lastAudit := "#" + str.tostring(trade + 1) + " $" + str.tostring(net, "#.00") + " / " + exitReason + " / planned $" + str.tostring(entryReservation, "#.00")
-            if auditLogs
-                string audit = "R2_TRADE_AUDIT|variant=" + studyMode + "|trade=" + str.tostring(trade + 1) + "|profile=" + (positionProfile == 0 ? "RTH" : "OVERNIGHT") + "|entry_risk_day=" + str.format_time(entryRiskDay, "yyyy-MM-dd", TZ) + "|planned_at_et=" + str.format_time(entryPlanTime, "yyyy-MM-dd HH:mm", TZ) + "|entry_et=" + str.format_time(strategy.closedtrades.entry_time(trade), "yyyy-MM-dd HH:mm", TZ) + "|exit_et=" + str.format_time(strategy.closedtrades.exit_time(trade), "yyyy-MM-dd HH:mm", TZ) + "|direction=" + str.tostring(positionDirection) + "|quantity=" + str.tostring(quantity) + "|reference=" + str.tostring(reference, "#.00") + "|entry=" + str.tostring(fill, "#.00") + "|initial_stop=" + str.tostring(initialStop, "#.00") + "|final_stop=" + str.tostring(activeStop, "#.00") + "|exit=" + str.tostring(exitFill, "#.00") + "|atr20=" + str.tostring(entryAtr, "#.000") + "|efficiency=" + str.tostring(entryEfficiency, "#.000") + "|required_efficiency=" + str.tostring(entryThreshold, "#.000") + "|planned_risk_usd=" + str.tostring(entryReservation, "#.00") + "|allowance_usd=" + str.tostring(entryAllowance, "#.00") + "|initial_risk_usd=" + str.tostring(originalRisk, "#.00") + "|net_usd=" + str.tostring(net, "#.00") + "|commission_usd=" + str.tostring(commission, "#.00") + "|mfe_emulator_usd=" + str.tostring(runup, "#.00") + "|mae_emulator_usd=" + str.tostring(drawdown, "#.00") + "|break_even_armed=" + str.tostring(breakEvenArmed) + "|exit_reason=" + exitReason + "|learning_eligible=" + str.tostring(eligible) + "|planned_risk_exceeded=" + str.tostring(-net > entryReservation + 0.00001)
-                audit += "|feed_label=" + feedLabel + "|account_stage=" + stage + "|paper_start_et=" + str.format_time(paperStart, "yyyy-MM-dd HH:mm", TZ) + "|session_loss_budget_usd=" + str.tostring(lossBudget, "#.00") + "|evaluation_target_usd=" + str.tostring(evalTarget, "#.00") + "|entry_chase_ticks=" + str.tostring(chaseTicks) + "|trade_cap_enabled=" + str.tostring(capEnabled) + "|trade_cap_usd=" + str.tostring(tradeCap, "#.00") + "|open_guard_enabled=" + str.tostring(openGuardEnabled) + "|open_buffer_before_min=" + str.tostring(openBefore) + "|open_buffer_after_min=" + str.tostring(openAfter) + "|be_enabled=" + str.tostring(useBE) + "|be_trigger_r=" + str.tostring(beTrigger, "#.00") + "|starting_contracts=" + str.tostring(startQty) + "|maximum_contracts=" + str.tostring(maxQty) + "|adaptive_sizing=" + str.tostring(adaptiveSize) + "|adaptive_quality=" + str.tostring(adaptiveQuality) + "|configured_fees_roundtrip_usd=" + str.tostring(feesRT, "#.00") + "|configured_exit_slippage_ticks=" + str.tostring(exitSlip)
-                audit += "|audit_version=" + AUDIT_VERSION + "|calendar_sha256=" + calendarHash + "|symbol=" + syminfo.tickerid + "|chart_session=" + syminfo.session + "|chart_interval=" + timeframe.period + "|loaded_first_bar_et=" + str.format_time(loadedFirstTime, "yyyy-MM-dd HH:mm", TZ)
-                log.info(audit)
             array<float> sizes = positionProfile == 0 ? daySizes : nightSizes
             [q, n, streak, since, weak, reason] = f_size_step(sizes, array.get(sizeQ, positionProfile), array.get(sizeCount, positionProfile), array.get(sizeStreak, positionProfile), array.get(sizeSince, positionProfile), array.get(sizeWeak, positionProfile), originalRisk > 0 ? net / originalRisk : 0, eligible, maxQty)
             array.set(sizeQ, positionProfile, q)
@@ -393,19 +349,19 @@ if barstate.isconfirmed
         bool closeExit = row < 0 or (not na(flattenAt) and time_close >= flattenAt)
         bool lossExit = sessionNet + strategy.openprofit - math.abs(strategy.position_size) * (feesRT / 2 + exitSlip * TICK * POINT) <= -lossBudget
         bool targetExit = stage == "Evaluation" and sessionNet + strategy.openprofit - math.abs(strategy.position_size) * (feesRT / 2 + exitSlip * TICK * POINT) >= evalTarget
-        if positionRisk <= 0 or closeExit or timeExit or newsPause or openPause or lossExit or targetExit or sessionLocked
-            string reason = positionRisk <= 0 ? "FILL_RISK_FAULT" : lossExit ? "SESSION_LOSS_EXIT" : targetExit ? "EVAL_TARGET_EXIT" : closeExit ? "SESSION_CLOSE_EXIT" : newsPause ? "NEWS_EXIT" : openPause ? "CASH_OPEN_BUFFER_EXIT" : sessionLocked ? "SESSION_LOCK_EXIT" : "HOLD_TIME_EXIT"
+        if positionRisk <= 0 or closeExit or timeExit or newsPause or lossExit or targetExit or sessionLocked
+            string reason = positionRisk <= 0 ? "FILL_RISK_FAULT" : lossExit ? "SESSION_LOSS_EXIT" : targetExit ? "EVAL_TARGET_EXIT" : closeExit ? "SESSION_CLOSE_EXIT" : newsPause ? "NEWS_EXIT" : sessionLocked ? "SESSION_LOCK_EXIT" : "HOLD_TIME_EXIT"
             strategy.close("R2", comment = reason, immediately = true)
             sessionLocked := sessionLocked or lossExit or targetExit or positionRisk <= 0
     if not na(pendingBar) and strategy.position_size == 0 and bar_index > pendingBar
         strategy.cancel_all()
         pendingBar := na
     sessionLocked := sessionLocked or sessionNet <= -lossBudget or (stage == "Evaluation" and sessionNet >= evalTarget)
-    decision := not symbolOK ? "WRONG_CONTRACT: use MNQZ2026" : not chartOK ? "USE_STANDARD_5_MINUTE_CANDLES" : not inputsOK ? "START_SIZE_EXCEEDS_MAXIMUM" : row < 0 ? "CALENDAR_EXPIRED_OR_MISSING" : time_close < paperStart ? "BEFORE_EXPERIMENT_START" : na(atr) or atr <= 0 ? "ATR_WARMUP: 21 completed prior cash days" : sessionLocked ? "SESSION_RISK_LOCK" : strategy.position_size != 0 ? "MANAGING_POSITION" : not na(pendingBar) ? "ENTRY_PENDING" : not marketAllowed ? "OUTSIDE_REVIEWED_ENTRY_HOURS" : newsPause ? "NEWS_PAUSE" : openEntryPause ? "CASH_OPEN_BUFFER" : lastExitBar == bar_index ? "CLOSED_TRADE_COOLDOWN" : signal == 0 ? "SCANNING: NO_QUALIFYING_SETUP" : "SETUP_READY"
+    decision := not symbolOK ? "WRONG_CONTRACT: use MNQZ2026" : not chartOK ? "USE_STANDARD_5_MINUTE_CANDLES" : not inputsOK ? "START_SIZE_EXCEEDS_MAXIMUM" : row < 0 ? "CALENDAR_EXPIRED_OR_MISSING" : time_close < paperStart ? "BEFORE_EXPERIMENT_START" : na(atr) or atr <= 0 ? "ATR_WARMUP: 21 completed prior cash days" : sessionLocked ? "SESSION_RISK_LOCK" : strategy.position_size != 0 ? "MANAGING_POSITION" : not na(pendingBar) ? "ENTRY_PENDING" : not marketAllowed ? "OUTSIDE_REVIEWED_ENTRY_HOURS" : newsPause ? "NEWS_PAUSE" : lastExitBar == bar_index ? "CLOSED_TRADE_COOLDOWN" : signal == 0 ? "SCANNING: NO_QUALIFYING_SETUP" : "SETUP_READY"
     if decision == "SETUP_READY"
         float limit = close + signal * chaseTicks * TICK
         float reservation = signal * (limit - signalStop) * POINT + feesRT + exitSlip * TICK * POINT
-        float remaining = f_allowance(lossBudget, sessionNet, capEnabled, tradeCap)
+        float remaining = math.max(0, lossBudget + math.min(0, sessionNet))
         int suggested = adaptiveSize ? array.get(sizeQ, profile) : startQty
         int quantity = f_fit(suggested, reservation, remaining)
         if quantity > 0
@@ -419,32 +375,22 @@ if barstate.isconfirmed
             entryEfficiency := setupEfficiency
             entryThreshold := minEfficiency
             entryReservation := quantity * reservation
-            entryAllowance := remaining
-            entryRiskDay := riskDay
-            entryPlanTime := time_close
             positionRisk := na
             peakPrice := na
             breakEvenArmed := false
             pendingBar := bar_index
             strategy.entry("R2", signal > 0 ? strategy.long : strategy.short, qty = quantity, limit = limit, comment = cashRegime ? "RTH_PULLBACK_BREAKOUT" : "OVERNIGHT_PULLBACK_BREAKOUT")
             strategy.exit("Protect", from_entry = "R2", stop = signalStop, comment = "PROTECTIVE_STOP")
-            if auditLogs
-                log.info("R2_ENTRY_PLAN|variant=" + studyMode + "|planned_at_et=" + str.format_time(time_close, "yyyy-MM-dd HH:mm", TZ) + "|direction=" + str.tostring(signal) + "|quantity=" + str.tostring(quantity) + "|reference=" + str.tostring(reference, "#.00") + "|limit=" + str.tostring(limit, "#.00") + "|initial_stop=" + str.tostring(signalStop, "#.00") + "|planned_risk_usd=" + str.tostring(entryReservation, "#.00") + "|allowance_usd=" + str.tostring(remaining, "#.00"))
             decision := "ENTRY_PENDING"
         else
-            riskRejects += 1
-            decision := capEnabled and tradeCap < math.max(0, lossBudget + math.min(0, sessionNet)) ? "TRADE_RISK_CAP_CANNOT_FIT_ONE_CONTRACT" : "RISK_BUDGET_CANNOT_FIT_ONE_CONTRACT"
+            decision := "RISK_BUDGET_CANNOT_FIT_ONE_CONTRACT"
 
 plot(strategy.position_size != 0 ? activeStop : na, "Active protective stop", color = color.orange, style = plot.style_linebr, linewidth = 2)
 plot(atr, "Lagged cash ATR20", display = display.data_window)
 plot(sessionNet, "Session net P&L ($)", display = display.data_window)
 plot(array.get(sizeQ, 0), "RTH evidence size", display = display.data_window)
 plot(array.get(sizeQ, 1), "Overnight evidence size", display = display.data_window)
-plot(entryReservation, "Last submitted planned position risk ($)", display = display.data_window)
-plot(entryAllowance, "Last submitted position risk allowance ($)", display = display.data_window)
-plot(riskRejects, "Setups rejected by cash risk", display = display.data_window)
-plot(openGuardBars, "Cash-open guard bars", display = display.data_window)
-var table dashboard = table.new(position.top_right, 2, 20, bgcolor = color.new(color.rgb(12, 21, 32), 5), frame_color = color.gray, frame_width = 1)
+var table dashboard = table.new(position.top_right, 2, 17, bgcolor = color.new(color.rgb(12, 21, 32), 5), frame_color = color.gray, frame_width = 1)
 var table lossReview = table.new(position.bottom_left, 1, 12, bgcolor = color.new(color.rgb(12, 21, 32), 5), frame_color = color.gray, frame_width = 1)
 f_cell(int line, string key, string value) =>
     table.cell(dashboard, 0, line, key, text_color = color.silver, text_size = size.small, text_halign = text.align_left)
@@ -467,9 +413,6 @@ if barstate.islast
     f_cell(14, "Costs / loss reviews", (feesVerified ? "User-verified" : "Provisional") + " / " + str.tostring(array.size(lossHeaders)) + " retained (max 20)")
     f_cell(15, "Calendar", "Oct 7–30, 2026; refresh before November")
     f_cell(16, "Model", "Closed-bar decisions; no tick/broker execution proof")
-    f_cell(17, "Paper variant / planned cap", studyMode + " / " + (capEnabled ? "$" + str.tostring(tradeCap, "#.00") : "session budget only"))
-    f_cell(18, "Risk rejections / open guard bars", str.tostring(riskRejects) + " / " + str.tostring(openGuardBars))
-    f_cell(19, "Last completed / initial plan", lastAudit)
     table.clear(lossReview, 0, 0, 0, 11)
     if reviewVisible
         int lossIndex = array.size(lossHeaders) - reviewBack

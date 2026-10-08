@@ -1,7 +1,26 @@
 # Implementation review and validation
 
+The guarded TradingView experiment retains the original baseline and adds a
+configurable planned-position risk cap plus cash-open buffer. Its four variants
+isolate baseline, cap-only, opening-only and combined behavior. The updated
+Python suite passed **189 tests**, including exact variant generation, audit
+reconciliation, duplicate/conflict rejection, session/settings isolation and
+preservation of existing reports. The analyzer's test data uses synthetic prices
+and dates, rather than publishing the user's private execution history.
+The independent Pine runtime checks now also include **1,000** allowance
+boundaries (profits never enlarge risk), in addition to the original 8,100
+entry/sizing/runner checks. Full-source execution verified that the baseline's
+complete fill/fee/P&L ledger matches the frozen pre-change source. The guarded
+variant still trades, fits each submitted position's planned risk to its cap
+and avoids intentional entry/holding through the cash opening buffer. Cap-only
+and opening-only checks isolate their effects. Actual production Pine audit
+text also round-tripped through the Python analyzer: every completed position
+appeared once, prices/stops/fees reconciled, and total closed net P&L matched.
+The current audit manifest distinguishes Evaluation targets and entry limits
+as well as session, sizing, fees, guards and calendar provenance.
+
 The current selected workflow is the TradingView Strategy Tester port. It
-passed 181 Python tests (the existing 174 plus seven release/calendar checks)
+initially passed 181 Python tests (the existing 174 plus seven release/calendar checks)
 and 8,100 extracted **production Pine** helper cases in independent PineTS
 0.11.0: 6,000 sizing steps, 1,500 cash-risk boundaries, 300 trailing-stop cases
 and 300 six-bar entry cases, compared with the Python engine. The full generated

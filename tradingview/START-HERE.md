@@ -91,6 +91,11 @@ kept as separate experiments.
 
 ## Entries, exits, learning and losses
 
+An optional [guarded test](GUARDED-TEST.md) adds a planned per-position risk
+cap and cash-open buffer with isolated comparison variants. The ordinary
+source defaults to **Baseline R2**. Each completed trade now has an optional
+structured Pine audit, including winners, alongside the original loss review.
+
 R2 scans reviewed electronic sessions, normally Sunday 18:00 to Friday 17:00 ET,
 with daily 17:00–18:00 maintenance. It does not force a trade and has no daily
 trade-count cap. A valid entry needs six contiguous closed five-minute bars,

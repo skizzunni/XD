@@ -4,7 +4,7 @@ from pathlib import Path
 import re
 import unittest
 
-from scripts.build_tradingview import CALENDAR, OUTPUT, questions, render
+from scripts.build_tradingview import CALENDAR, GUARDED_OUTPUT, OUTPUT, questions, render
 from bot.data import Calendar
 from bot.fullsession import FullSessionCalendar
 
@@ -16,6 +16,15 @@ class TradingViewReleaseTests(unittest.TestCase):
         self.assertEqual(OUTPUT.read_text(), render())
         self.assertEqual(render(), render())
         self.assertNotIn("// @GENERATED_CALENDAR@", OUTPUT.read_text())
+
+    def test_guarded_release_has_same_rules_and_separate_defaults(self):
+        guarded = GUARDED_OUTPUT.read_text()
+        self.assertEqual(guarded, render("guarded"))
+        self.assertEqual(guarded.replace('strategy("MNQ R2 Guarded Paper Test",', 'strategy("MNQ R2 Paper Research",', 1).replace('input.string("Guarded R2", "Paper test variant"', 'input.string("Baseline R2", "Paper test variant"', 1), OUTPUT.read_text())
+        with self.assertRaisesRegex(ValueError, "Unknown"):
+            render("unreviewed")
+        for source in (guarded, OUTPUT.read_text()):
+            self.assertEqual(len(re.findall(r"^\s*(?:indicator|strategy|library)\(", source, re.M)), 1)
 
     def test_calendar_provenance_and_all_session_fields(self):
         source = OUTPUT.read_text()

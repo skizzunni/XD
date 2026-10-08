@@ -13,6 +13,14 @@ TradingView's separate built-in Paper Trading account. Native TradingView
 compile/chart acceptance remains required; cloud checks use an independent
 runtime. This is a candle-based port and recalculates with available history.
 
+The separate [guarded paper experiment](tradingview/GUARDED-TEST.md) adds a
+configurable planned-position risk cap (default $25) and cash-open buffer
+(09:25–09:40 ET) while preserving the $100 session budget. Use
+**COPY-TRADINGVIEW-GUARDED.cmd** for **MNQ_R2_Guarded.pine**. Baseline, cap-only,
+opening-only and combined variants support fixed comparisons. Completed-trade
+Pine audits record stops, planned risk, fees, excursions, exits and chart
+settings. This is a separate unproven experiment, not evidence of greater profit.
+
 **Standalone Python + Databento remains available.** Extract the full
 package and double-click **START-DEMO.cmd** to verify the bot and browser with
 synthetic prices. Then arrange real-time CME data with Databento and run

@@ -9,7 +9,10 @@ const root = fileURLToPath(new URL('../../', import.meta.url));
 const python = process.env.MNQ_TEST_PYTHON || `${root}.venv/bin/python`;
 const cases = JSON.parse(execFileSync(python, ['-m', 'scripts.tradingview_cases'], {cwd:root,maxBuffer:20_000_000}));
 const source = readFileSync(new URL('../MNQ_R2_Paper.pine', import.meta.url), 'utf8');
+const guardedSource = readFileSync(new URL('../MNQ_R2_Guarded.pine', import.meta.url), 'utf8');
+const preservedSource = readFileSync(new URL('../baselines/MNQ_R2_PreGuard.pine', import.meta.url), 'utf8');
 new Indicator(source).prepare();
+new Indicator(guardedSource).prepare();
 const helpers = source.split('// @HELPERS_BEGIN@')[1].split('// @HELPERS_END@')[0];
 const preamble = `//@version=6\nindicator("Extracted production helper checks")\nconst string TZ="America/New_York"\nconst float TICK=0.25\n` + helpers;
 const basicBars = n => Array.from({length:n},(_,i)=>({openTime:Date.parse('2026-10-07T00:00Z')+i*300000,closeTime:Date.parse('2026-10-07T00:00Z')+(i+1)*300000,open:30000,high:30001,low:29999,close:30000,volume:i}));
@@ -55,6 +58,11 @@ code=preamble+'plot(f_fit(int(volume),open,close),"fit")\n';
 result=await new PineTS(basicBars(cases.fit.length).map((b,i)=>({...b,open:cases.fit[i].risk,close:cases.fit[i].remaining,volume:cases.fit[i].q})),'TEST','5').run(code);
 cases.fit.forEach((c,i)=>assert.equal(last(result,'fit',i),c.expected,`cash boundary ${i}`));
 console.log(`PASS: ${cases.fit.length} production Pine quantity cash boundaries`);
+
+code=preamble+'plot(f_allowance(open,close,int(volume)==1,high),"allowance")\n';
+result=await new PineTS(basicBars(cases.allowance.length).map((b,i)=>({...b,open:cases.allowance[i].budget,close:cases.allowance[i].pnl,high:cases.allowance[i].cap,volume:cases.allowance[i].capped?1:0})),'TEST','5').run(code);
+cases.allowance.forEach((c,i)=>near(last(result,'allowance',i),c.expected,`planned risk cap ${i}`));
+console.log(`PASS: ${cases.allowance.length} trade-cap/session-risk cases (profits never enlarge allowance)`);
 
 code=preamble+'plot(f_runner(open>0?1:-1,math.abs(open),low,high,close,volume),"stop")\n';
 result=await new PineTS(basicBars(cases.runner.length).map((b,i)=>({...b,open:cases.runner[i].d*cases.runner[i].fill,low:cases.runner[i].risk,high:cases.runner[i].peak,close:cases.runner[i].stop,volume:cases.runner[i].quote})),'TEST','5').run(code);
@@ -104,9 +112,9 @@ for(const row of calendar.sessions.filter(r=>r.date<='2026-10-09')){
 function provider(primaryBars=primary, secondaryBars=secondary, ticker='MNQZ2026'){
   return {configure(){},async getMarketData(_,timeframe){return timeframe==='15'?secondaryBars:primaryBars;},async getSymbolInfo(){return {tickerid:`CME_MINI:${ticker}`,ticker,root:'MNQ',prefix:'CME_MINI',timezone:'America/New_York',type:'futures',mintick:.25,pointvalue:2,minmove:1,pricescale:4,session:'extended',currency:'USD',mincontract:1};}};
 }
-async function full(overrides={}, p=provider()){
+async function full(overrides={}, p=provider(), program=source){
   const runtime=new PineTS(p,'CME_MINI:MNQZ2026','5',primary.length);
-  const r=await runtime.run(new Indicator(source,overrides));
+  const r=await runtime.run(new Indicator(program,{'Write entry plans and every completed trade to Pine Logs':false,...overrides}));
   assert.equal(r.warnings.length,0,'No independent-runtime warnings');
   return r;
 }
@@ -131,6 +139,12 @@ contains(tableText(result,1),'1. Did the setup meet all mechanical entry criteri
 contains(tableText(result,1),'10. Was quantity within');
 console.log(`PASS: full-source ${primary.length} synthetic ETH bars; cash/night entries, losses, fees and chart tables`);
 
+const baselineResult=result;
+const preserved=await full({'Session loss budget ($)':1000,'Write 30 answers to Pine Logs on each loss':false},provider(),preservedSource);
+const ledger=r=>r.strategy.closedtrades.map(t=>({entry:t.entry_price,exit:t.exit_price,entryTime:t.entry_time,exitTime:t.exit_time,size:t.size,profit:t.profit,commission:t.commission,reason:t.exit_comment}));
+assert.deepEqual(ledger(baselineResult),ledger(preserved),'Baseline orders/fills/net are identical to the preserved original');
+console.log('PASS: complete baseline ledger unchanged from the pre-guard source');
+
 const wrong=await full({'Write 30 answers to Pine Logs on each loss':false},provider(primary,secondary,'MNQ1!'));
 assert.equal(wrong.strategy.closedtrades.length,0,'Wrong contract stays blocked');
 contains(tableText(wrong),'WRONG_CONTRACT');
@@ -153,3 +167,43 @@ const missingBar=secondary.filter(b=>b.openTime!==Date.parse('2026-10-01T10:00:0
 const gap=await full({'Write 30 answers to Pine Logs on each loss':false},provider(primary,missingBar));
 assert.equal(gap.strategy.closedtrades.length,0,'Missing reviewed cash bar resets ATR; no phantom coverage');
 console.log('PASS: all 30 loss-review answers rendered, Evaluation target, and incomplete-cash-history block');
+
+const guarded=await full({'Session loss budget ($)':1000,'Write 30 answers to Pine Logs on each loss':false},provider(),guardedSource);
+assert.ok(guarded.strategy.closedtrades.length>0,'Guarded variant can still trade');
+for(let i=0;i<primary.length;i++){
+  const plan=last(guarded,'Last submitted planned position risk ($)',i);
+  const allowed=last(guarded,'Last submitted position risk allowance ($)',i);
+  if(Number.isFinite(plan)){assert.ok(plan<=25+1e-8,'Full position plan fits $25 cap');assert.ok(plan<=allowed+1e-8);}
+}
+for(const t of guarded.strategy.closedtrades){
+  const entry=new Date(t.entry_time-4*60*60000),exit=new Date(t.exit_time-4*60*60000);
+  const entryMinutes=entry.getUTCHours()*60+entry.getUTCMinutes();
+  const exitMinutes=exit.getUTCHours()*60+exit.getUTCMinutes();
+  assert.ok(entryMinutes<565||entryMinutes>=580,'No entries in cash opening buffer');
+  assert.ok(!(entry.toISOString().slice(0,10)===exit.toISOString().slice(0,10)&&entryMinutes<565&&exitMinutes>=570),'No held position carried through cash open');
+}
+contains(tableText(guarded),'Guarded R2');
+assert.ok(last(guarded,'Cash-open guard bars',primary.length-1)>0,'Open guard actually processed bars');
+const capOnly=await full({'Paper test variant':'Trade risk cap only','Session loss budget ($)':1000,'Write 30 answers to Pine Logs on each loss':false});
+assert.equal(last(capOnly,'Cash-open guard bars',primary.length-1),0,'Trade-cap-only experiment does not silently enable opening guard');
+const openOnly=await full({'Paper test variant':'Cash open guard only','Session loss budget ($)':1000,'Write 30 answers to Pine Logs on each loss':false});
+assert.ok(primary.some((_,i)=>last(openOnly,'Last submitted planned position risk ($)',i)>25),'Opening-only experiment does not silently cap trade risk');
+console.log('PASS: guarded planned risk/opening protection and isolated cap-only/open-only variants');
+
+// Actual production Pine log text must round-trip through the separate Python reconciler.
+const auditLines=[];
+const originalLog=console.log;
+let audited;
+try {
+  console.log=(message,...args)=>{if(typeof message==='string' && /R2_(TRADE_AUDIT|ENTRY_PLAN)\|/.test(message))auditLines.push(message);else originalLog(message,...args);};
+  audited=await full({'Session loss budget ($)':1000,'Write 30 answers to Pine Logs on each loss':false,'Write entry plans and every completed trade to Pine Logs':true});
+} finally {console.log=originalLog;}
+const review=JSON.parse(execFileSync(python,['-c','import json,sys; from scripts.analyze_pine_audit import analyze; print(json.dumps(analyze(sys.stdin.read()),allow_nan=False))'],{cwd:root,input:auditLines.join('\n'),maxBuffer:5_000_000}));
+assert.equal(review.experiments.length,1,'One fixed synthetic configuration');
+assert.equal(review.experiments[0].summary.completed_positions,audited.strategy.closedtrades.length,'Every completion was audited exactly once');
+near(review.experiments[0].summary.net_usd,audited.strategy.closedtrades.reduce((s,t)=>s+t.profit,0),'Audits reconcile completed net P&L');
+assert.equal(review.experiments[0].configuration.chart_session,'extended');
+assert.equal(review.experiments[0].configuration.symbol,'CME_MINI:MNQZ2026');
+assert.equal(review.experiments[0].configuration.evaluation_target_usd,'750.00');
+assert.equal(review.experiments[0].configuration.entry_chase_ticks,'4');
+console.log('PASS: actual production Pine audit text round-trips through Python reconciliation');
