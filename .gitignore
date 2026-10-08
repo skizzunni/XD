@@ -4,6 +4,7 @@ __pycache__/
 .live-venv/
 .env
 .env.*
+node_modules/
 runs/
 data/
 *.egg-info/

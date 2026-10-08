@@ -1,0 +1,8 @@
+{
+  "name": "mnq-tradingview-validation",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {"check": "node validate.mjs"},
+  "dependencies": {"pinets": "0.11.0"}
+}

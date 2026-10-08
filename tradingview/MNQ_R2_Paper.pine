@@ -1,0 +1,424 @@
+//@version=6
+// Generated release: MNQ_R2_Paper.pine. Edit this template, then run scripts/build_tradingview.py.
+// Strategy Tester simulation only. Chart bars cannot establish broker execution quality.
+strategy("MNQ R2 Paper Research", overlay = true, initial_capital = 25000, currency = currency.USD, default_qty_type = strategy.fixed, default_qty_value = 2, pyramiding = 0, commission_type = strategy.commission.cash_per_contract, commission_value = 0.75, slippage = 1, margin_long = 1, margin_short = 1, calc_on_every_tick = true, calc_on_order_fills = false, process_orders_on_close = false, max_bars_back = 500)
+
+const string TZ = "America/New_York"
+const float TICK = 0.25
+const float POINT = 2.0
+const int MINUTE = 60000
+stage = input.string("Funded", "Account stage", options = ["Funded", "Evaluation"], group = "Account")
+lossBudget = input.float(100, "Session loss budget ($)", minval = 1, group = "Account")
+evalTarget = input.float(750, "Evaluation session profit target ($)", minval = 1, group = "Account")
+paperStart = input.time(timestamp("07 Oct 2026 00:00 -0400"), "Paper experiment start (ET)", group = "Account")
+feedLabel = input.string("Delayed research", "Chart data entitlement (label only)", options = ["Delayed research", "Real-time research"], group = "Account")
+startQty = input.int(2, "Starting MNQ contracts", minval = 1, maxval = 10, group = "Sizing")
+maxQty = input.int(10, "Maximum MNQ contracts", minval = 1, maxval = 10, group = "Sizing")
+adaptiveSize = input.bool(true, "Adaptive paper sizing", group = "Sizing")
+adaptiveQuality = input.bool(true, "Learn quality from completed trades", group = "Sizing")
+feesRT = input.float(1.50, "Round-trip fees per contract ($): match Properties", minval = 0, group = "Execution model")
+exitSlip = input.int(1, "Exit slippage ticks: match Properties", minval = 0, group = "Execution model")
+chaseTicks = input.int(4, "Entry limit distance (ticks)", minval = 0, maxval = 20, group = "Execution model")
+feesVerified = input.bool(false, "Fees verified against actual account", group = "Execution model")
+useBE = input.bool(true, "Use cost-aware break-even", group = "Execution model")
+beTrigger = input.float(1, "Break-even trigger (initial R)", minval = 0.5, group = "Execution model")
+reviewVisible = input.bool(true, "Show loss review", group = "Dashboard")
+reviewPage = input.int(1, "Loss review page (1–3)", minval = 1, maxval = 3, group = "Dashboard")
+reviewBack = input.int(1, "Loss to review (1 = newest, up to 20)", minval = 1, maxval = 20, group = "Dashboard")
+lossLogs = input.bool(true, "Write 30 answers to Pine Logs on each loss", group = "Dashboard")
+
+// Reviewed calendar SHA256: d44212925351b30d34d0a370c0ad4fd269ad88ee9bcfcb055a3e4a7b78823fc0
+var array<int> calDay = array.from(1787544000000, 1787630400000, 1787716800000, 1787803200000, 1787889600000, 1788148800000, 1788235200000, 1788321600000, 1788408000000, 1788494400000, 1788840000000, 1788926400000, 1789012800000, 1789099200000, 1789358400000, 1789444800000, 1789531200000, 1789617600000, 1789704000000, 1789963200000, 1790049600000, 1790136000000, 1790222400000, 1790308800000, 1790568000000, 1790654400000, 1790740800000, 1790827200000, 1790913600000, 1791172800000, 1791259200000, 1791345600000, 1791432000000, 1791518400000, 1791777600000, 1791864000000, 1791950400000, 1792036800000, 1792123200000, 1792382400000, 1792468800000, 1792555200000, 1792641600000, 1792728000000, 1792987200000, 1793073600000, 1793160000000, 1793246400000, 1793332800000)
+var array<int> cashOpen = array.from(1787578200000, 1787664600000, 1787751000000, 1787837400000, 1787923800000, 1788183000000, 1788269400000, 1788355800000, 1788442200000, 1788528600000, 1788874200000, 1788960600000, 1789047000000, 1789133400000, 1789392600000, 1789479000000, 1789565400000, 1789651800000, 1789738200000, 1789997400000, 1790083800000, 1790170200000, 1790256600000, 1790343000000, 1790602200000, 1790688600000, 1790775000000, 1790861400000, 1790947800000, 1791207000000, 1791293400000, 1791379800000, 1791466200000, 1791552600000, 1791811800000, 1791898200000, 1791984600000, 1792071000000, 1792157400000, 1792416600000, 1792503000000, 1792589400000, 1792675800000, 1792762200000, 1793021400000, 1793107800000, 1793194200000, 1793280600000, 1793367000000)
+var array<int> cashClose = array.from(1787601600000, 1787688000000, 1787774400000, 1787860800000, 1787947200000, 1788206400000, 1788292800000, 1788379200000, 1788465600000, 1788552000000, 1788897600000, 1788984000000, 1789070400000, 1789156800000, 1789416000000, 1789502400000, 1789588800000, 1789675200000, 1789761600000, 1790020800000, 1790107200000, 1790193600000, 1790280000000, 1790366400000, 1790625600000, 1790712000000, 1790798400000, 1790884800000, 1790971200000, 1791230400000, 1791316800000, 1791403200000, 1791489600000, 1791576000000, 1791835200000, 1791921600000, 1792008000000, 1792094400000, 1792180800000, 1792440000000, 1792526400000, 1792612800000, 1792699200000, 1792785600000, 1793044800000, 1793131200000, 1793217600000, 1793304000000, 1793390400000)
+var array<int> marketOpen = array.from(1787522400000, 1787608800000, 1787695200000, 1787781600000, 1787868000000, 1788127200000, 1788213600000, 1788300000000, 1788386400000, 1788472800000, 1788818400000, 1788904800000, 1788991200000, 1789077600000, 1789336800000, 1789423200000, 1789509600000, 1789596000000, 1789682400000, 1789941600000, 1790028000000, 1790114400000, 1790200800000, 1790287200000, 1790546400000, 1790632800000, 1790719200000, 1790805600000, 1790892000000, 1791151200000, 1791237600000, 1791324000000, 1791410400000, 1791496800000, 1791756000000, 1791842400000, 1791928800000, 1792015200000, 1792101600000, 1792360800000, 1792447200000, 1792533600000, 1792620000000, 1792706400000, 1792965600000, 1793052000000, 1793138400000, 1793224800000, 1793311200000)
+var array<int> marketClose = array.from(1787605200000, 1787691600000, 1787778000000, 1787864400000, 1787950800000, 1788210000000, 1788296400000, 1788382800000, 1788469200000, 1788555600000, 1788901200000, 1788987600000, 1789074000000, 1789160400000, 1789419600000, 1789506000000, 1789592400000, 1789678800000, 1789765200000, 1790024400000, 1790110800000, 1790197200000, 1790283600000, 1790370000000, 1790629200000, 1790715600000, 1790802000000, 1790888400000, 1790974800000, 1791234000000, 1791320400000, 1791406800000, 1791493200000, 1791579600000, 1791838800000, 1791925200000, 1792011600000, 1792098000000, 1792184400000, 1792443600000, 1792530000000, 1792616400000, 1792702800000, 1792789200000, 1793048400000, 1793134800000, 1793221200000, 1793307600000, 1793394000000)
+var array<bool> enabled = array.from(false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true, true)
+var array<int> newsStart = array.from(1787590500000, 1787602200000, 1787602200000, 1787676900000, 1787676900000, 1787688600000, 1787747100000, 1787747100000, 1787752500000, 1787752500000, 1787763300000, 1787775000000, 1787838900000, 1787838900000, 1787849700000, 1787861400000, 1787862300000, 1787925300000, 1787925300000, 1787925300000, 1787925300000, 1787936100000, 1787947800000, 1787947800000, 1788195300000, 1788207000000, 1788207000000, 1788267600000, 1788270900000, 1788281700000, 1788293400000, 1788293400000, 1788357300000, 1788368100000, 1788371700000, 1788379800000, 1788438300000, 1788438300000, 1788438300000, 1788454500000, 1788466200000, 1788467100000, 1788524700000, 1788540900000, 1788552600000, 1788552600000, 1788886500000, 1788893700000, 1788898200000, 1788898200000, 1788962100000, 1788972900000, 1788984600000, 1789043100000, 1789059300000, 1789071000000, 1789071900000, 1789129500000, 1789129500000, 1789142100000, 1789145700000, 1789157400000, 1789157400000, 1789404900000, 1789416600000, 1789416600000, 1789491300000, 1789503000000, 1789561500000, 1789577700000, 1789581300000, 1789583100000, 1789589400000, 1789664100000, 1789675800000, 1789676700000, 1789737000000, 1789737900000, 1789739700000, 1789750500000, 1789762200000, 1789762200000, 1790009700000, 1790021400000, 1790021400000, 1790086500000, 1790096100000, 1790096100000, 1790107800000, 1790172000000, 1790182500000, 1790194200000, 1790252700000, 1790258100000, 1790258100000, 1790268900000, 1790272500000, 1790280600000, 1790281500000, 1790344500000, 1790355300000, 1790367000000, 1790367000000, 1790597400000, 1790614500000, 1790616000000, 1790626200000, 1790626200000, 1790690100000, 1790693700000, 1790699700000, 1790700900000, 1790708100000, 1790712600000, 1790771100000, 1790771100000, 1790776500000, 1790787300000, 1790796000000, 1790799000000, 1790862900000, 1790862900000, 1790873700000, 1790875500000, 1790875500000, 1790880900000, 1790880900000, 1790882700000, 1790882700000, 1790885400000, 1790885400000, 1790886300000, 1790943900000, 1790960100000, 1790971800000, 1790971800000, 1791219300000, 1791231000000, 1791231000000, 1791289500000, 1791294900000, 1791297600000, 1791297600000, 1791305700000, 1791317400000, 1791392100000, 1791395700000, 1791395700000, 1791399300000, 1791403800000, 1791447900000, 1791447900000, 1791478500000, 1791490200000, 1791491100000, 1791564900000, 1791576600000, 1791576600000, 1791910500000, 1791922200000, 1791922200000, 1791980700000, 1791980700000, 1791996900000, 1792000500000, 1792008600000, 1792067100000, 1792083300000, 1792095000000, 1792095900000, 1792153500000, 1792156200000, 1792169700000, 1792181400000, 1792181400000, 1792428900000, 1792440600000, 1792440600000, 1792504500000, 1792515300000, 1792527000000, 1792590900000, 1792601700000, 1792613400000, 1792688100000, 1792699800000, 1792700700000, 1792774500000, 1792786200000, 1792786200000, 1793033700000, 1793045400000, 1793045400000, 1793120100000, 1793120100000, 1793131800000, 1793195700000, 1793195700000, 1793206500000, 1793210100000, 1793211900000, 1793218200000, 1793276700000, 1793276700000, 1793282100000, 1793292900000, 1793304600000, 1793305500000, 1793363100000, 1793379300000, 1793391000000, 1793391000000)
+var array<int> newsEnd = array.from(1787591400000, 1787603100000, 1787603100000, 1787677800000, 1787677800000, 1787689500000, 1787748000000, 1787748000000, 1787753400000, 1787753400000, 1787764200000, 1787775900000, 1787839800000, 1787839800000, 1787850600000, 1787862300000, 1787863200000, 1787926200000, 1787926200000, 1787926200000, 1787926200000, 1787937000000, 1787948700000, 1787948700000, 1788196200000, 1788207900000, 1788207900000, 1788268500000, 1788271800000, 1788282600000, 1788294300000, 1788294300000, 1788358200000, 1788369000000, 1788372600000, 1788380700000, 1788439200000, 1788439200000, 1788439200000, 1788455400000, 1788467100000, 1788468000000, 1788525600000, 1788541800000, 1788553500000, 1788553500000, 1788887400000, 1788894600000, 1788899100000, 1788899100000, 1788963000000, 1788973800000, 1788985500000, 1789044000000, 1789060200000, 1789071900000, 1789072800000, 1789130400000, 1789130400000, 1789143000000, 1789146600000, 1789158300000, 1789158300000, 1789405800000, 1789417500000, 1789417500000, 1789492200000, 1789503900000, 1789562400000, 1789578600000, 1789582200000, 1789584000000, 1789590300000, 1789665000000, 1789676700000, 1789677600000, 1789737900000, 1789738800000, 1789740600000, 1789751400000, 1789763100000, 1789763100000, 1790010600000, 1790022300000, 1790022300000, 1790087400000, 1790097000000, 1790097000000, 1790108700000, 1790172900000, 1790183400000, 1790195100000, 1790253600000, 1790259000000, 1790259000000, 1790269800000, 1790273400000, 1790281500000, 1790282400000, 1790345400000, 1790356200000, 1790367900000, 1790367900000, 1790598300000, 1790615400000, 1790616900000, 1790627100000, 1790627100000, 1790691000000, 1790694600000, 1790700600000, 1790701800000, 1790709000000, 1790713500000, 1790772000000, 1790772000000, 1790777400000, 1790788200000, 1790796900000, 1790799900000, 1790863800000, 1790863800000, 1790874600000, 1790876400000, 1790876400000, 1790881800000, 1790881800000, 1790883600000, 1790883600000, 1790886300000, 1790886300000, 1790887200000, 1790944800000, 1790961000000, 1790972700000, 1790972700000, 1791220200000, 1791231900000, 1791231900000, 1791290400000, 1791295800000, 1791298500000, 1791298500000, 1791306600000, 1791318300000, 1791393000000, 1791396600000, 1791396600000, 1791400200000, 1791404700000, 1791448800000, 1791448800000, 1791479400000, 1791491100000, 1791492000000, 1791565800000, 1791577500000, 1791577500000, 1791911400000, 1791923100000, 1791923100000, 1791981600000, 1791981600000, 1791997800000, 1792001400000, 1792009500000, 1792068000000, 1792084200000, 1792095900000, 1792096800000, 1792154400000, 1792157100000, 1792170600000, 1792182300000, 1792182300000, 1792429800000, 1792441500000, 1792441500000, 1792505400000, 1792516200000, 1792527900000, 1792591800000, 1792602600000, 1792614300000, 1792689000000, 1792700700000, 1792701600000, 1792775400000, 1792787100000, 1792787100000, 1793034600000, 1793046300000, 1793046300000, 1793121000000, 1793121000000, 1793132700000, 1793196600000, 1793196600000, 1793207400000, 1793211000000, 1793212800000, 1793219100000, 1793277600000, 1793277600000, 1793283000000, 1793293800000, 1793305500000, 1793306400000, 1793364000000, 1793380200000, 1793391900000, 1793391900000)
+var array<int> breakStart = array.new<int>()
+var array<int> breakEnd = array.new<int>()
+var array<string> questions = array.from("Did the setup meet all mechanical entry criteria?", "Was the signal based on the required completed bars?", "Was ATR20 lagged and based only on completed prior sessions?", "Was this a reviewed full futures session?", "Did scheduled news fall inside the forbidden closing window?", "Was the contract explicitly mapped and was rollover excluded?", "Were there timestamp, duplicate, stale-feed or coverage faults before exit?", "Was the stop resting on a broker server?", "Was protection activated immediately after entry?", "Was quantity within the selected paper-contract setting?", "Were contracts added to a losing position to break even faster?", "Did entry exceed the configured chase/slippage cap?", "Were fees verified against the actual account schedule?", "Was spread observed rather than estimated or counted twice?", "Did costs turn a non-losing gross result into a net loss?", "Was the pre-entry market directional or choppy?", "Was stop distance unusually small or large relative to lagged volatility?", "How adverse did the trade become before exit?", "Was the trade profitable at any observed tick before losing?", "Was break-even protection disabled, never reached, or active?", "Did a stop gap/slippage defeat break-even or the emergency stop?", "Was the loss caused at a time exit, stop, target, or fault exit?", "Was this one fill for a fresh setup rather than a duplicate entry?", "Did the realized loss exceed the configured session loss budget?", "Was the correct evaluation/funded target policy active?", "Was the firm's trailing drawdown or consistency rule breached?", "Was a manual override or discretionary filter applied?", "Could latency, order rejection or partial fills explain the loss?", "Does this loss recur on this side, quarter or news regime?", "Would a proposed fix generalize to untouched future sessions?")
+
+// @HELPERS_BEGIN@
+f_futures_day(int ts) =>
+    timestamp(TZ, year(ts, TZ), month(ts, TZ), dayofmonth(ts, TZ) + (hour(ts, TZ) >= 18 ? 1 : 0), 0, 0)
+
+f_round_stop(float price, int direction) =>
+    direction > 0 ? math.floor(price / TICK) * TICK : math.ceil(price / TICK) * TICK
+
+f_fit(int suggested, float reservation, float remaining) =>
+    int quantity = reservation > 0 ? math.min(suggested, math.max(0, int(math.floor(remaining / reservation)))) : 0
+    while quantity > 0 and quantity * reservation > remaining
+        quantity -= 1
+    quantity
+
+f_window_stats(array<float> recent) =>
+    float net = 0
+    float positive = 0
+    float negative = 0
+    float equity = 0
+    float peak = 0
+    float dd = 0
+    float largest = 0
+    int wins = 0
+    if array.size(recent) > 0
+        for value in recent
+            net += value
+            positive += math.max(0, value)
+            negative += math.max(0, -value)
+            equity += value
+            peak := math.max(peak, equity)
+            dd := math.max(dd, peak - equity)
+            largest := math.max(largest, value)
+            wins += value > 0 ? 1 : 0
+    bool qualifies = array.size(recent) == 20 and net >= 4 and (negative == 0 or positive >= 1.5 * negative) and wins >= 8 and net - largest > 0 and dd < 3
+    [net, dd, qualifies]
+
+f_size_step(array<float> recent, int quantity, int count, int streak, int sinceReduction, bool weakLatched, float value, bool eligible, int maximum) =>
+    int q = quantity
+    int n = count
+    int ls = streak
+    int since = sinceReduction
+    bool weak = weakLatched
+    string reason = "FAULT_REDUCTION"
+    if not eligible
+        q := math.max(1, int(math.floor(q / 2)))
+        ls := 0
+        since := 0
+    else
+        n += 1
+        since += 1
+        array.push(recent, value)
+        if array.size(recent) > 20
+            array.shift(recent)
+        ls := value < 0 ? ls + 1 : 0
+        reason := n < 20 ? "BUILDING_RECORD" : "HOLD_SIZE"
+        if ls >= 2
+            q := math.max(1, ls == 2 ? int(math.floor(q / 2)) : q - 1)
+            since := 0
+            reason := "LOSS_STREAK_REDUCTION"
+        [net, dd, qualifies] = f_window_stats(recent)
+        bool nowWeak = array.size(recent) == 20 and (net <= 0 or dd >= 3)
+        if nowWeak and not weak
+            q := math.max(1, int(math.floor(q / 2)))
+            since := 0
+            reason := "WEAK_WINDOW_REDUCTION"
+        weak := nowWeak
+        if n % 20 == 0 and qualifies and value > 0 and since >= 5
+            reason := q < maximum ? "PROFITABLE_BLOCK_INCREASE" : "AT_MAXIMUM"
+            q := math.min(maximum, q + 1)
+    [q, n, ls, since, weak, reason]
+
+f_quality(array<float> outcomes, float base, bool enabledQuality) =>
+    enabledQuality and array.size(outcomes) == 8 and array.sum(outcomes) <= 0 ? math.min(0.90, base + 0.15) : base
+
+f_runner(int direction, float fill, float risk, float peak, float stop, float executable) =>
+    float proposed = f_round_stop(peak - direction * risk, direction)
+    direction * (peak - fill) >= 1.5 * risk and direction * (proposed - stop) >= TICK and direction * (executable - proposed) > TICK ? proposed : stop
+
+f_setup(float atr, float minimumEfficiency, float maxStopAtr) =>
+    float change = close - open[5]
+    float path = math.abs(close[5] - open[5])
+    bool contiguous = bar_index >= 5
+    for i = 0 to 4
+        path += math.abs(close[i] - close[i + 1])
+        contiguous := contiguous and time[i] == time_close[i + 1]
+    float momentum = atr > 0 ? change / atr : 0
+    int direction = momentum >= 0.05 ? 1 : momentum <= -0.05 ? -1 : 0
+    float efficiency = path > 0 ? math.abs(change) / path : 0
+    float width = high - low
+    float stop = direction > 0 ? low[1] - TICK : high[1] + TICK
+    float risk = direction * (close - stop)
+    bool breakout = direction > 0 ? close > math.max(high[2], high[1]) and (close - low) / width >= 0.70 : close < math.min(low[2], low[1]) and (high - close) / width >= 0.70
+    bool valid = contiguous and atr > 0 and direction != 0 and efficiency >= minimumEfficiency and width > 0 and width <= 0.25 * atr and direction * (close[1] - open[1]) < 0 and breakout and risk > 0 and risk <= maxStopAtr * atr
+    [valid ? direction : 0, f_round_stop(stop, direction), efficiency, momentum]
+// @HELPERS_END@
+
+// ATR is calculated from 26 complete fifteen-minute cash bars per reviewed day.
+// This preserves cash highs/lows/closing price, but cannot prove intra-bar tick coverage.
+f_cash_atr() =>
+    var array<float> ranges = array.new<float>()
+    var int activeRow = -1
+    var int completedRow = -1
+    var float previousClose = na
+    var float cashHigh = na
+    var float cashLow = na
+    var int count = 0
+    var int lastEnd = na
+    int dayKey = timestamp(TZ, year(time, TZ), month(time, TZ), dayofmonth(time, TZ), 0, 0)
+    int row = array.indexof(calDay, dayKey)
+    if row >= 0
+        int start = array.get(cashOpen, row)
+        int finish = array.get(cashClose, row)
+        if time >= start and time_close <= finish
+            if row != activeRow
+                activeRow := row
+                count := 0
+                cashHigh := high
+                cashLow := low
+                lastEnd := na
+                if time != start or (completedRow >= 0 and row != completedRow + 1)
+                    array.clear(ranges)
+                    previousClose := na
+            bool sequential = count == 0 ? time == start : time == lastEnd
+            if not sequential
+                array.clear(ranges)
+                previousClose := na
+                count := -1000
+            cashHigh := math.max(cashHigh, high)
+            cashLow := math.min(cashLow, low)
+            count += 1
+            lastEnd := time_close
+            if time_close == finish
+                if count == 26 and finish - start == 390 * MINUTE
+                    float tr = na(previousClose) ? na : math.max(cashHigh - cashLow, math.max(math.abs(cashHigh - previousClose), math.abs(cashLow - previousClose)))
+                    if not na(tr)
+                        array.push(ranges, tr)
+                        if array.size(ranges) > 21
+                            array.shift(ranges)
+                    previousClose := close
+                    completedRow := row
+                else
+                    array.clear(ranges)
+                    previousClose := na
+    float latest = na
+    float lagged = na
+    int n = array.size(ranges)
+    if n >= 20
+        float sum = 0
+        for i = n - 20 to n - 1
+            sum += array.get(ranges, i)
+        latest := sum / 20
+    if n >= 21
+        float sum = 0
+        for i = n - 21 to n - 2
+            sum += array.get(ranges, i)
+        lagged := sum / 20
+    [latest, lagged, completedRow, n]
+
+[cashAtr, priorCashAtr, atrRow, atrCount] = request.security(syminfo.tickerid, "15", f_cash_atr(), gaps = barmerge.gaps_off, lookahead = barmerge.lookahead_off, calc_bars_count = 5000)
+int riskDay = f_futures_day(time)
+int row = array.indexof(calDay, riskDay)
+float atr = na
+if row >= 0 and atrRow >= 0 and (atrRow == row - 1 or atrRow == row)
+    atr := atrRow == row ? priorCashAtr : cashAtr
+bool cashRegime = hour(time_close, TZ) * 60 + minute(time_close, TZ) >= 570 and hour(time_close, TZ) * 60 + minute(time_close, TZ) < 960
+int profile = cashRegime ? 0 : 1
+bool symbolOK = syminfo.root == "MNQ" and syminfo.ticker == "MNQZ2026" and math.abs(syminfo.mintick - TICK) < 0.000001 and math.abs(syminfo.pointvalue - POINT) < 0.000001
+bool chartOK = timeframe.isminutes and timeframe.multiplier == 5 and chart.is_standard
+bool inputsOK = startQty <= maxQty
+bool marketAllowed = false
+bool newsPause = false
+int flattenAt = na
+int enterUntil = na
+if row >= 0
+    int start = array.get(marketOpen, row)
+    int finish = array.get(marketClose, row)
+    marketAllowed := array.get(enabled, row) and time_close >= start + 30 * MINUTE and time_close <= finish - 15 * MINUTE
+    flattenAt := finish - 5 * MINUTE
+    enterUntil := finish - 15 * MINUTE
+    if array.size(breakStart) > 0
+        for i = 0 to array.size(breakStart) - 1
+            int a = array.get(breakStart, i)
+            int b = array.get(breakEnd, i)
+            if b > time_close and a >= start and a <= finish
+                flattenAt := math.min(flattenAt, a - 5 * MINUTE)
+                enterUntil := math.min(enterUntil, a - 5 * MINUTE)
+            if time_close >= a and time_close < b
+                marketAllowed := false
+    marketAllowed := marketAllowed and time_close <= enterUntil
+for i = 0 to array.size(newsStart) - 1
+    // Block bars overlapping a news pause and entries whose next fill bar would cross it.
+    int a = array.get(newsStart, i)
+    int b = array.get(newsEnd, i)
+    newsPause := newsPause or (time < b and time_close + 5 * MINUTE > a)
+
+var array<float> daySizes = array.new<float>()
+var array<float> nightSizes = array.new<float>()
+var array<int> sizeQ = array.from(startQty, startQty)
+var array<int> sizeCount = array.from(0, 0)
+var array<int> sizeStreak = array.from(0, 0)
+var array<int> sizeSince = array.from(20, 20)
+var array<bool> sizeWeak = array.from(false, false)
+var array<string> sizeReason = array.from("BUILDING_RECORD", "BUILDING_RECORD")
+var array<float> dayLong = array.new<float>()
+var array<float> dayShort = array.new<float>()
+var array<float> nightLong = array.new<float>()
+var array<float> nightShort = array.new<float>()
+var array<string> reviews = array.new<string>()
+var array<string> lossHeaders = array.new<string>()
+var int processedClosed = 0
+var int lastExitBar = -1
+var int activeRiskDay = na
+var float sessionNet = 0
+var bool sessionLocked = false
+var int pendingBar = na
+var int positionProfile = 0
+var int positionDirection = 0
+var int plannedQty = 0
+var float reference = na
+var float initialStop = na
+var float activeStop = na
+var float entryAtr = na
+var float entryEfficiency = na
+var float entryThreshold = na
+var float entryReservation = na
+var float positionRisk = na
+var float peakPrice = na
+var bool breakEvenArmed = false
+var string decision = "WAITING_FOR_BAR"
+
+array<float> qualityLong = profile == 0 ? dayLong : nightLong
+array<float> qualityShort = profile == 0 ? dayShort : nightShort
+float baseEfficiency = cashRegime ? 0.40 : 0.55
+float longEfficiency = f_quality(qualityLong, baseEfficiency, adaptiveQuality)
+float shortEfficiency = f_quality(qualityShort, baseEfficiency, adaptiveQuality)
+float change = close - open[5]
+float minEfficiency = change >= 0 ? longEfficiency : shortEfficiency
+[signal, signalStop, setupEfficiency, setupMomentum] = f_setup(atr, minEfficiency, cashRegime ? 0.20 : 0.10)
+
+if barstate.isconfirmed
+    if na(activeRiskDay) or riskDay != activeRiskDay
+        activeRiskDay := riskDay
+        sessionNet := 0
+        sessionLocked := strategy.position_size != 0 or not na(pendingBar)
+    if strategy.closedtrades > processedClosed
+        for trade = processedClosed to strategy.closedtrades - 1
+            float net = strategy.closedtrades.profit(trade)
+            float quantity = math.abs(strategy.closedtrades.size(trade))
+            float fill = strategy.closedtrades.entry_price(trade)
+            float exitFill = strategy.closedtrades.exit_price(trade)
+            float originalRisk = positionDirection * (fill - initialStop) * POINT * quantity
+            float gross = positionDirection * (exitFill - fill) * POINT * quantity
+            float commission = strategy.closedtrades.commission(trade)
+            bool eligible = originalRisk > 0 and quantity == plannedQty and math.abs(commission - feesRT * quantity) < 0.00001 and positionDirection * (fill - reference) / TICK <= chaseTicks + 0.00001 and quantity * (originalRisk / math.max(1, quantity) + feesRT + exitSlip * TICK * POINT) <= entryReservation + 0.00001
+            if f_futures_day(strategy.closedtrades.exit_time(trade)) == riskDay
+                sessionNet += net
+            array<float> sizes = positionProfile == 0 ? daySizes : nightSizes
+            [q, n, streak, since, weak, reason] = f_size_step(sizes, array.get(sizeQ, positionProfile), array.get(sizeCount, positionProfile), array.get(sizeStreak, positionProfile), array.get(sizeSince, positionProfile), array.get(sizeWeak, positionProfile), originalRisk > 0 ? net / originalRisk : 0, eligible, maxQty)
+            array.set(sizeQ, positionProfile, q)
+            array.set(sizeCount, positionProfile, n)
+            array.set(sizeStreak, positionProfile, streak)
+            array.set(sizeSince, positionProfile, since)
+            array.set(sizeWeak, positionProfile, weak)
+            array.set(sizeReason, positionProfile, reason)
+            if eligible
+                array<float> learning = positionProfile == 0 ? (positionDirection > 0 ? dayLong : dayShort) : (positionDirection > 0 ? nightLong : nightShort)
+                array.push(learning, net)
+                if array.size(learning) > 8
+                    array.shift(learning)
+            else
+                sessionLocked := true
+            if net < 0
+                string header = "Loss #" + str.tostring(trade + 1) + " / " + (positionProfile == 0 ? "RTH" : "OVERNIGHT") + " / " + str.format_time(strategy.closedtrades.exit_time(trade), "yyyy-MM-dd HH:mm", TZ) + " ET / $" + str.tostring(net, "#.00")
+                array.push(lossHeaders, header)
+                array<string> answers = array.from("Passed entry guards; efficiency " + str.tostring(entryEfficiency, "#.000") + "/" + str.tostring(entryThreshold, "#.000"), "Six contiguous closed five-minute bars", "Prior completed cash sessions only; ATR " + str.tostring(entryAtr, "#.00"), "Reviewed calendar; candle coverage only", "Entry paused for supplied releases; completeness unknown", "Frozen MNQ December 2026; continuous contracts excluded", "Tick faults cannot be inferred from candle data", "No broker server: emulator stop", "Stop submitted with entry; intrabar path is modeled", str.tostring(quantity) + " MNQ; full planned risk reserved", "No additions to positions; pyramiding=0", "Adverse entry ticks " + str.tostring(positionDirection * (fill - reference) / TICK, "#.00"), feesVerified ? "User marked verified; charged $" + str.tostring(commission, "#.00") : "Fees provisional; charged $" + str.tostring(commission, "#.00"), "Bid/ask unobserved on 5-minute chart; spread unknown", gross >= 0 ? "Yes: costs erased nonnegative gross profit" : "No: gross price result was negative", "Entry efficiency " + str.tostring(entryEfficiency, "#.000") + "; causal chop inference unknown", "Initial stop/ATR " + str.tostring(math.abs(fill - initialStop) / entryAtr, "#.000"), "Emulator MAE $" + str.tostring(strategy.closedtrades.max_drawdown(trade), "#.00"), "Emulator MFE $" + str.tostring(strategy.closedtrades.max_runup(trade), "#.00") + "; tick path unknown", useBE ? (breakEvenArmed ? "Armed on a completed bar" : "Trigger not armed on a completed bar") : "Disabled", "Stop-to-exit adverse ticks " + str.tostring(math.max(0, positionDirection * (activeStop - exitFill) / TICK), "#.00"), strategy.closedtrades.exit_comment(trade), "One position; no repeated order on the same signal bar", "Session net $" + str.tostring(sessionNet, "#.00") + " / loss budget $" + str.tostring(lossBudget, "#.00"), stage + (stage == "Evaluation" ? "; target $" + str.tostring(evalTarget, "#.00") : "; no profit target"), "Unknown: funding-firm rules are not supplied", "Settings edits rebuild history; no manual order route", "Unknown: queue, partial fills, latency and size impact unmodeled", "Separated by side and cash/overnight; recurrence needs more sessions", "Unknown until chronological holdout and forward validation")
+                for i = 0 to 29
+                    string line = str.tostring(i + 1) + ". " + array.get(questions, i) + "  " + array.get(answers, i)
+                    array.push(reviews, line)
+                    if lossLogs
+                        log.info(header + " | " + line)
+                if array.size(lossHeaders) > 20
+                    array.shift(lossHeaders)
+                    for i = 0 to 29
+                        array.shift(reviews)
+        processedClosed := strategy.closedtrades
+        lastExitBar := bar_index
+        pendingBar := na
+        positionRisk := na
+        peakPrice := na
+    if strategy.position_size != 0
+        pendingBar := na
+        if na(positionRisk)
+            positionRisk := positionDirection * (strategy.position_avg_price - initialStop)
+            peakPrice := strategy.position_avg_price
+        // Closed-bar peak avoids letting a high/low retroactively move a stop within this bar.
+        peakPrice := positionDirection > 0 ? math.max(peakPrice, close) : math.min(peakPrice, close)
+        if useBE and positionRisk > 0 and positionDirection * (close - strategy.position_avg_price) >= beTrigger * positionRisk
+            float costTicks = math.ceil(feesRT / (TICK * POINT) + exitSlip)
+            float beStop = f_round_stop(strategy.position_avg_price + positionDirection * costTicks * TICK, positionDirection)
+            if positionDirection * (beStop - activeStop) >= TICK and positionDirection * (close - beStop) > TICK
+                activeStop := beStop
+                breakEvenArmed := true
+        if positionRisk > 0
+            activeStop := f_runner(positionDirection, strategy.position_avg_price, positionRisk, peakPrice, activeStop, close)
+        strategy.exit("Protect", from_entry = "R2", stop = activeStop, comment = "PROTECTIVE_STOP")
+        int entryTime = strategy.opentrades.entry_time(0)
+        bool timeExit = time_close >= entryTime + (positionProfile == 0 ? 90 : 45) * MINUTE
+        bool closeExit = row < 0 or (not na(flattenAt) and time_close >= flattenAt)
+        bool lossExit = sessionNet + strategy.openprofit - math.abs(strategy.position_size) * (feesRT / 2 + exitSlip * TICK * POINT) <= -lossBudget
+        bool targetExit = stage == "Evaluation" and sessionNet + strategy.openprofit - math.abs(strategy.position_size) * (feesRT / 2 + exitSlip * TICK * POINT) >= evalTarget
+        if positionRisk <= 0 or closeExit or timeExit or newsPause or lossExit or targetExit or sessionLocked
+            string reason = positionRisk <= 0 ? "FILL_RISK_FAULT" : lossExit ? "SESSION_LOSS_EXIT" : targetExit ? "EVAL_TARGET_EXIT" : closeExit ? "SESSION_CLOSE_EXIT" : newsPause ? "NEWS_EXIT" : sessionLocked ? "SESSION_LOCK_EXIT" : "HOLD_TIME_EXIT"
+            strategy.close("R2", comment = reason, immediately = true)
+            sessionLocked := sessionLocked or lossExit or targetExit or positionRisk <= 0
+    if not na(pendingBar) and strategy.position_size == 0 and bar_index > pendingBar
+        strategy.cancel_all()
+        pendingBar := na
+    sessionLocked := sessionLocked or sessionNet <= -lossBudget or (stage == "Evaluation" and sessionNet >= evalTarget)
+    decision := not symbolOK ? "WRONG_CONTRACT: use MNQZ2026" : not chartOK ? "USE_STANDARD_5_MINUTE_CANDLES" : not inputsOK ? "START_SIZE_EXCEEDS_MAXIMUM" : row < 0 ? "CALENDAR_EXPIRED_OR_MISSING" : time_close < paperStart ? "BEFORE_EXPERIMENT_START" : na(atr) or atr <= 0 ? "ATR_WARMUP: 21 completed prior cash days" : sessionLocked ? "SESSION_RISK_LOCK" : strategy.position_size != 0 ? "MANAGING_POSITION" : not na(pendingBar) ? "ENTRY_PENDING" : not marketAllowed ? "OUTSIDE_REVIEWED_ENTRY_HOURS" : newsPause ? "NEWS_PAUSE" : lastExitBar == bar_index ? "CLOSED_TRADE_COOLDOWN" : signal == 0 ? "SCANNING: NO_QUALIFYING_SETUP" : "SETUP_READY"
+    if decision == "SETUP_READY"
+        float limit = close + signal * chaseTicks * TICK
+        float reservation = signal * (limit - signalStop) * POINT + feesRT + exitSlip * TICK * POINT
+        float remaining = math.max(0, lossBudget + math.min(0, sessionNet))
+        int suggested = adaptiveSize ? array.get(sizeQ, profile) : startQty
+        int quantity = f_fit(suggested, reservation, remaining)
+        if quantity > 0
+            plannedQty := quantity
+            positionProfile := profile
+            positionDirection := signal
+            reference := close
+            initialStop := signalStop
+            activeStop := signalStop
+            entryAtr := atr
+            entryEfficiency := setupEfficiency
+            entryThreshold := minEfficiency
+            entryReservation := quantity * reservation
+            positionRisk := na
+            peakPrice := na
+            breakEvenArmed := false
+            pendingBar := bar_index
+            strategy.entry("R2", signal > 0 ? strategy.long : strategy.short, qty = quantity, limit = limit, comment = cashRegime ? "RTH_PULLBACK_BREAKOUT" : "OVERNIGHT_PULLBACK_BREAKOUT")
+            strategy.exit("Protect", from_entry = "R2", stop = signalStop, comment = "PROTECTIVE_STOP")
+            decision := "ENTRY_PENDING"
+        else
+            decision := "RISK_BUDGET_CANNOT_FIT_ONE_CONTRACT"
+
+plot(strategy.position_size != 0 ? activeStop : na, "Active protective stop", color = color.orange, style = plot.style_linebr, linewidth = 2)
+plot(atr, "Lagged cash ATR20", display = display.data_window)
+plot(sessionNet, "Session net P&L ($)", display = display.data_window)
+plot(array.get(sizeQ, 0), "RTH evidence size", display = display.data_window)
+plot(array.get(sizeQ, 1), "Overnight evidence size", display = display.data_window)
+var table dashboard = table.new(position.top_right, 2, 17, bgcolor = color.new(color.rgb(12, 21, 32), 5), frame_color = color.gray, frame_width = 1)
+var table lossReview = table.new(position.bottom_left, 1, 12, bgcolor = color.new(color.rgb(12, 21, 32), 5), frame_color = color.gray, frame_width = 1)
+f_cell(int line, string key, string value) =>
+    table.cell(dashboard, 0, line, key, text_color = color.silver, text_size = size.small, text_halign = text.align_left)
+    table.cell(dashboard, 1, line, value, text_color = color.white, text_size = size.small, text_halign = text.align_left)
+if barstate.islast
+    f_cell(0, "MNQ R2", "STRATEGY TESTER SIMULATION")
+    f_cell(1, "Data", feedLabel + "; entitlement not detected")
+    f_cell(2, "Decision (last close)", decision)
+    f_cell(3, "Chart bar / execution clock", str.format_time(time, "MM-dd HH:mm", TZ) + " / " + str.format_time(timenow, "HH:mm:ss", TZ) + " ET")
+    f_cell(4, "Stage / futures day", stage + " / " + str.format_time(riskDay, "yyyy-MM-dd", TZ))
+    f_cell(5, "Regime / chart price", (cashRegime ? "RTH" : "OVERNIGHT") + " / " + str.tostring(close, format.mintick))
+    f_cell(6, "Cash ATR20 / TR count", str.tostring(atr, "#.00") + " / " + str.tostring(atrCount))
+    f_cell(7, "Position / stop", str.tostring(strategy.position_size) + " / " + (strategy.position_size != 0 ? str.tostring(activeStop, format.mintick) : "flat"))
+    f_cell(8, "Net closed / open P&L", "$" + str.tostring(strategy.netprofit, "#.00") + " / $" + str.tostring(strategy.openprofit, "#.00"))
+    f_cell(9, "Session net / budget", "$" + str.tostring(sessionNet, "#.00") + " / $" + str.tostring(lossBudget, "#.00"))
+    f_cell(10, "Completed / win rate", str.tostring(strategy.closedtrades) + " / " + (strategy.closedtrades > 0 ? str.tostring(100.0 * strategy.wintrades / strategy.closedtrades, "#.0") + "%" : "—"))
+    f_cell(11, "RTH size / clean outcomes", str.tostring(array.get(sizeQ, 0)) + " / " + str.tostring(array.get(sizeCount, 0)) + " / " + array.get(sizeReason, 0))
+    f_cell(12, "Night size / clean outcomes", str.tostring(array.get(sizeQ, 1)) + " / " + str.tostring(array.get(sizeCount, 1)) + " / " + array.get(sizeReason, 1))
+    f_cell(13, "Current long / short filter", str.tostring(longEfficiency, "#.00") + " / " + str.tostring(shortEfficiency, "#.00"))
+    f_cell(14, "Costs / loss reviews", (feesVerified ? "User-verified" : "Provisional") + " / " + str.tostring(array.size(lossHeaders)) + " retained (max 20)")
+    f_cell(15, "Calendar", "Oct 7–30, 2026; refresh before November")
+    f_cell(16, "Model", "Closed-bar decisions; no tick/broker execution proof")
+    table.clear(lossReview, 0, 0, 0, 11)
+    if reviewVisible
+        int lossIndex = array.size(lossHeaders) - reviewBack
+        table.cell(lossReview, 0, 0, lossIndex >= 0 ? array.get(lossHeaders, lossIndex) : "No matching losses recorded", text_color = color.orange, text_size = size.small, text_halign = text.align_left)
+        table.cell(lossReview, 0, 1, "30 diagnostic questions / page " + str.tostring(reviewPage) + " of 3 / change Inputs to select", text_color = color.silver, text_size = size.small, text_halign = text.align_left)
+        if lossIndex >= 0
+            for i = 0 to 9
+                int offset = lossIndex * 30 + (reviewPage - 1) * 10 + i
+                table.cell(lossReview, 0, i + 2, array.get(reviews, offset), text_color = color.white, text_size = size.tiny, text_halign = text.align_left)

@@ -1,5 +1,33 @@
 # Implementation review and validation
 
+The current selected workflow is the TradingView Strategy Tester port. It
+passed 181 Python tests (the existing 174 plus seven release/calendar checks)
+and 8,100 extracted **production Pine** helper cases in independent PineTS
+0.11.0: 6,000 sizing steps, 1,500 cash-risk boundaries, 300 trailing-stop cases
+and 300 six-bar entry cases, compared with the Python engine. The full generated
+Pine source executed over 828 synthetic electronic-session bars with actual
+simulated cash/overnight entries, stops, losing trades, per-side commission and
+net accounting. Fifteen-minute context bars were aggregated from the same
+underlying five-minute fixture; every displayed cash ATR matched a separately
+computed prior-cash-session oracle, including the 18:00 risk-day boundary.
+All 30 loss answers rendered across three pages. Wrong contract, insufficient
+history, a missing cash bar and future experiment start prevented trades;
+the Evaluation profit target changed actual entry behavior. Four npm packages
+have verified registry signatures, and frozen `npm ci` reproduced installation.
+Affected Python lint/compile, Node syntax and generated-source consistency passed.
+
+These are offline checks with an independent runtime, **not TradingView's
+official Pine compiler/emulator**. TradingView Pine Editor save/Add to chart,
+the Windows clipboard helper, actual chart data and real-market profitability
+still require local acceptance. Candle simulation does not prove tick coverage,
+bid/ask freshness, order queues, broker stop custody, latency or liquidity.
+The chart accepts labeled delayed research data, requires no paid alerts/API,
+and cannot route Pine orders into TradingView's built-in Paper Trading account.
+The supplied reviewed calendar enables October 7–30, 2026; refresh before
+November. Pine results rebuild from available chart history/settings, rather
+than the standalone bot's durable SQLite journal. See
+[the TradingView setup and model differences](tradingview/START-HERE.md).
+
 Validated in the cloud development machine. Native NinjaTrader assemblies,
 Windows PowerShell execution, actual MNQ ticks/quotes and account fees are not
 available here; native compilation/playback and profitability are unverified.

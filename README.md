@@ -1,6 +1,19 @@
 # MNQ strategy research and paper bot
 
-**Standalone Python + Databento is the current paper setup.** Extract the full
+**TradingView Strategy Tester is the current selected paper workflow.** Open
+**MNQZ2026**, standard **5-minute** candles with the electronic session; paste
+**tradingview/MNQ_R2_Paper.pine** into Pine Editor and Add to chart. The script
+simulates entries/exits automatically and displays its dashboard on the chart.
+No API key or local launcher is needed. After Extract All, **COPY-TRADINGVIEW.cmd**
+copies the Pine source for pasting. [Follow the TradingView guide](tradingview/START-HERE.md).
+It includes Funded/Evaluation settings, separate cash/overnight rules, adaptive
+sizing and 30-question loss reviews. Free MNQ chart data may be delayed; this
+version accepts it as labeled research. Pine cannot route these orders into
+TradingView's separate built-in Paper Trading account. Native TradingView
+compile/chart acceptance remains required; cloud checks use an independent
+runtime. This is a candle-based port and recalculates with available history.
+
+**Standalone Python + Databento remains available.** Extract the full
 package and double-click **START-DEMO.cmd** to verify the bot and browser with
 synthetic prices. Then arrange real-time CME data with Databento and run
 **START-PAPER.cmd**. [Follow the standalone setup guide](STANDALONE-START-HERE.md).
