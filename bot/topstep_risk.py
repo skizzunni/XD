@@ -23,14 +23,14 @@ SIMULATED_STAGES = {"practice", "trading_combine", "express_funded"}
 
 @dataclass(frozen=True)
 class TopstepRiskConfig:
-    stage: str = "practice"
-    account_size: int = 100_000
-    per_position_risk_usd: float = 75.0
-    session_loss_lock_usd: float = 300.0
-    session_profit_lock_usd: float = 1_000.0
-    mll_safety_buffer_usd: float = 750.0
+    stage: str = "trading_combine"
+    account_size: int = 50_000
+    per_position_risk_usd: float = 50.0
+    session_loss_lock_usd: float = 200.0
+    session_profit_lock_usd: float = 500.0
+    mll_safety_buffer_usd: float = 500.0
     starting_micros: int = 1
-    maximum_micros: int = 20
+    maximum_micros: int = 10
     maximum_consecutive_losses: int = 3
     round_turn_fees_usd_per_micro: float = 1.22
     modeled_round_turn_slippage_ticks: int = 2

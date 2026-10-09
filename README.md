@@ -1,7 +1,7 @@
 # MNQ strategy research and paper bot
 
 The [Topstep rebuild guide](TOPSTEP-START-HERE.md) adds a read-only ProjectX
-client, a 100K Practice/Trading Combine/XFA risk profile and cost-aware manual
+client, a 50K Standard Trading Combine risk profile and cost-aware manual
 trade analysis. Order writes remain disabled. Topstep Live Funded accounts do
 not support API automation; promotion requires local Practice evidence first.
 

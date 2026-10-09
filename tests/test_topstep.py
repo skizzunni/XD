@@ -17,25 +17,25 @@ ET = ZoneInfo("America/New_York")
 
 class TopstepRiskTests(unittest.TestCase):
     def state(self, **changes):
-        values = dict(timestamp=datetime(2026, 1, 6, 10, tzinfo=ET), balance=100_000,
-                      unrealized_pnl=0, session_net_pnl=0, mll_floor=97_000)
+        values = dict(timestamp=datetime(2026, 1, 6, 10, tzinfo=ET), balance=50_000,
+                      unrealized_pnl=0, session_net_pnl=0, mll_floor=48_000)
         values.update(changes)
         return TopstepRiskState(**values)
 
     def test_size_fits_stop_costs_daily_and_mll_buffers(self):
         config = TopstepRiskConfig()
-        decision = decide_entry(config, self.state(), 40, 20, 100)
+        decision = decide_entry(config, self.state(), 40, 20, 50)
         self.assertTrue(decision.allowed)
-        self.assertEqual(decision.quantity, 3)
+        self.assertEqual(decision.quantity, 2)
         self.assertAlmostEqual(decision.per_micro_reservation_usd, 22.22)
-        self.assertLessEqual(decision.position_reservation_usd, 75)
-        self.assertEqual(config.firm_max_micros, 100)
+        self.assertLessEqual(decision.position_reservation_usd, 50)
+        self.assertEqual(config.firm_max_micros, 50)
 
     def test_profit_never_enlarges_risk_and_losses_reduce_it(self):
         config = TopstepRiskConfig()
-        base = decide_entry(config, self.state(), 20, 20, 100)
-        profit = decide_entry(config, self.state(session_net_pnl=500), 20, 20, 100)
-        loss = decide_entry(config, self.state(session_net_pnl=-280), 20, 20, 100)
+        base = decide_entry(config, self.state(), 20, 20, 50)
+        profit = decide_entry(config, self.state(session_net_pnl=100), 20, 20, 50)
+        loss = decide_entry(config, self.state(session_net_pnl=-180), 20, 20, 50)
         self.assertEqual(base.quantity, profit.quantity)
         self.assertLess(loss.quantity, base.quantity)
 
@@ -46,13 +46,13 @@ class TopstepRiskTests(unittest.TestCase):
             "HIGH_IMPACT_NEWS_BUFFER": dict(news_blocked=True),
             "POSITION_OR_ENTRY_ALREADY_ACTIVE": dict(open_micros=1),
             "LOSS_STREAK_LOCK": dict(consecutive_losses=3),
-            "MLL_SAFETY_BUFFER": dict(balance=97_700),
-            "SESSION_LOSS_LOCK": dict(session_net_pnl=-300),
-            "SESSION_PROFIT_LOCK": dict(session_net_pnl=1000),
+            "MLL_SAFETY_BUFFER": dict(balance=48_500),
+            "SESSION_LOSS_LOCK": dict(session_net_pnl=-200),
+            "SESSION_PROFIT_LOCK": dict(session_net_pnl=500),
         }
         for reason, changes in cases.items():
             with self.subTest(reason=reason):
-                self.assertEqual(decide_entry(config, self.state(**changes), 20, 2, 100).reason, reason)
+                self.assertEqual(decide_entry(config, self.state(**changes), 20, 2, 50).reason, reason)
 
     def test_topstep_closed_window_and_live_stage(self):
         config = TopstepRiskConfig()
@@ -63,10 +63,17 @@ class TopstepRiskTests(unittest.TestCase):
             TopstepRiskConfig(stage="live_funded")
 
     def test_shipped_profile_is_safe_and_loadable(self):
-        raw = json.loads((Path(__file__).parents[1]/"config.topstep-100k.json").read_text())
+        raw = json.loads((Path(__file__).parents[1]/"config.topstep-50k-standard.json").read_text())
         names = {field.name for field in fields(TopstepRiskConfig)}
         config = TopstepRiskConfig(**{key: value for key, value in raw.items() if key in names})
-        self.assertEqual(config.stage, "practice")
+        self.assertEqual(config.stage, "trading_combine")
+        self.assertEqual(config.account_size, 50_000)
+        self.assertEqual(config.per_position_risk_usd, 50)
+        self.assertEqual(config.session_loss_lock_usd, 200)
+        self.assertEqual(config.session_profit_lock_usd, 500)
+        self.assertEqual(config.mll_safety_buffer_usd, 500)
+        self.assertEqual(config.maximum_micros, 10)
+        self.assertEqual(raw["account_plan"], "standard")
         self.assertFalse(raw["execution_enabled"])
         self.assertTrue(raw["require_server_stop_bracket"])
         self.assertTrue(raw["require_auto_oco_brackets"])

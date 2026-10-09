@@ -1,7 +1,7 @@
 # Implementation review and validation
 
 The Topstep rebuild adds a stdlib ProjectX REST client with order writes off by
-default, a cost-aware 100K Practice/Combine/XFA risk gate, an append-only
+default, a cost-aware 50K Standard Trading Combine risk gate, an append-only
 completed-bar collector and a manual-position analyzer. Eleven focused tests cover
 cash-fitted MNQ sizing, fees/slippage, MLL and daily buffers, profit-independent
 risk, stale/news/session/loss-streak locks, Live Funded refusal, disabled order

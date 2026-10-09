@@ -9,13 +9,13 @@ but is unavailable after a Live call-up.
 
 ## Firm rules captured on October 8, 2026
 
-For a **100K Trading Combine**, Topstep publishes a **$6,000 profit target**,
-**$3,000 trailing Maximum Loss Limit**, **10 mini / 100 micro** maximum position
+For a **50K Standard Trading Combine**, Topstep publishes a **$3,000 profit target**,
+**$2,000 trailing Maximum Loss Limit**, **5 mini / 50 micro** maximum position
 and a 55% best-day consistency target. The trading day runs from **5:00 PM CT to
 3:10 PM CT**; the bot stops new entries at **3:08 PM CT** and must be flat by
 3:10. The firm maximum is only an outer boundary, never a recommended size.
 
-An XFA starts at a $0 balance. Its MLL begins at -$3,000 for the 100K tier,
+An XFA starts at a $0 balance. Its MLL begins at -$2,000 for the 50K tier,
 trails at end of day and eventually locks at $0. Its current Scaling Plan limit
 must be read from Topstep before every session; increases do not become available
 mid-session. The bot therefore takes an explicit platform maximum rather than
@@ -45,16 +45,16 @@ belong only in local environment variables and must never enter this repository.
 
 ## Local risk policy
 
-The supplied 100K profile begins with **1 MNQ**, can adapt only up to **20 MNQ**,
-reserves no more than **$75 per position**, locks after **-$300** or **+$1,000**
-in a Topstep session, preserves a **$750 buffer above the current MLL**, and
+The supplied 50K Standard profile begins with **1 MNQ**, can adapt only up to
+**10 MNQ**, reserves no more than **$50 per position**, locks after **-$200** or
+**+$500** in a Topstep session, preserves a **$500 buffer above the current MLL**, and
 locks after three consecutive losses. Quantity includes the structural stop,
 the observed **$1.22 MNQ round-turn commission/fees**, and two modeled slippage
 ticks. Profits never expand the day's risk allowance. One open position only;
 no pyramiding or additions to losers.
 
 These are starting controls for forward research, not fitted optimal values.
-`config.topstep-100k.json` keeps `execution_enabled` false. A structural stop
+`config.topstep-50k-standard.json` keeps `execution_enabled` false. A structural stop
 cannot be moved closer merely to fit more contracts. If one MNQ does not fit,
 the setup is rejected. Every live submission must have a server-side stop and
 target through Auto OCO brackets. A rejected or ambiguous order is reconciled
