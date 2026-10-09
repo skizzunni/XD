@@ -1,0 +1,23 @@
+{
+  "stage": "practice",
+  "account_size": 100000,
+  "account_name": "REPLACE_WITH_EXACT_TOPSTEP_ACCOUNT_NAME",
+  "execution_enabled": false,
+  "instrument": "MNQ",
+  "per_position_risk_usd": 75.0,
+  "session_loss_lock_usd": 300.0,
+  "session_profit_lock_usd": 1000.0,
+  "mll_safety_buffer_usd": 750.0,
+  "starting_micros": 1,
+  "maximum_micros": 20,
+  "maximum_consecutive_losses": 3,
+  "round_turn_fees_usd_per_micro": 1.22,
+  "modeled_round_turn_slippage_ticks": 2,
+  "maximum_quote_age_seconds": 2.0,
+  "require_server_stop_bracket": true,
+  "require_auto_oco_brackets": true,
+  "major_news_blackout_before_minutes": 15,
+  "major_news_blackout_after_minutes": 15,
+  "flatten_time_central": "15:08",
+  "topstep_day_start_central": "17:00"
+}

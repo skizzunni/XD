@@ -1,5 +1,15 @@
 # Implementation review and validation
 
+The Topstep rebuild adds a stdlib ProjectX REST client with order writes off by
+default, a cost-aware 100K Practice/Combine/XFA risk gate, an append-only
+completed-bar collector and a manual-position analyzer. Eleven focused tests cover
+cash-fitted MNQ sizing, fees/slippage, MLL and daily buffers, profit-independent
+risk, stale/news/session/loss-streak locks, Live Funded refusal, disabled order
+writes, ambiguous-order no-retry behavior, fill/P&L reconciliation and collector
+deduplication. No Topstep credentials, account connection, market-data request or
+order endpoint was used in cloud validation. Local read-only acceptance and the
+required Practice forward test remain outstanding.
+
 The guarded TradingView experiment retains the original baseline and adds a
 configurable planned-position risk cap plus cash-open buffer. Its four variants
 isolate baseline, cap-only, opening-only and combined behavior. The updated

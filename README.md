@@ -1,5 +1,10 @@
 # MNQ strategy research and paper bot
 
+The [Topstep rebuild guide](TOPSTEP-START-HERE.md) adds a read-only ProjectX
+client, a 100K Practice/Trading Combine/XFA risk profile and cost-aware manual
+trade analysis. Order writes remain disabled. Topstep Live Funded accounts do
+not support API automation; promotion requires local Practice evidence first.
+
 **TradingView Strategy Tester is the current selected paper workflow.** Open
 **MNQZ2026**, standard **5-minute** candles with the electronic session; paste
 **tradingview/MNQ_R2_Paper.pine** into Pine Editor and Add to chart. The script
