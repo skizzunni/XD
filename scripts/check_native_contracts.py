@@ -36,12 +36,23 @@ def main():
     parser.add_argument("--dotnet", default="dotnet")
     args = parser.parse_args()
     source = (ROOT / "ninjatrader/MNQPlanPaper.cs").read_text()
+    for required in (
+        "PaperContracts = 1;", "AdaptiveSizing = true;", "MaximumPaperContracts = 3;",
+        "SessionLossLimit = 100;", "SessionProfitLock = 500;",
+        "ProfitProtectionActivation = 150;", "MaximumProfitGiveback = 100;",
+        "MaximumConsecutiveLosses = 2;", "LossCooldownMinutes = 30;",
+        "if(sessionLossStreak>0) selected=Math.Min(selected,1);",
+    ):
+        if required not in source:
+            raise RuntimeError(f"Native funded-protection default missing: {required}")
     methods = "\n".join(extract_method(source, signature) for signature in (
         "private static string MnqContractKey", "private static bool SameMnqContract"))
     methods += "\n"+"\n".join(extract_method(source, signature) for signature in (
         "private bool IsRolling", "private bool UseTrendRunner", "private int MaximumHoldMinutes", "private static double RunnerStop", "private DateTime TradingDay", "private static bool Overnight", "private bool MarketOpen",
         "private DateTime FlattenAt", "private string ScheduledExitReason", "private DateTime LastEntryAt", "private double MaximumStopAtr", "private string QualityArm",
-        "private double GapSeconds", "private double RealizedFor", "private QualityState QualityFor", "private static bool ConnectionShouldLatch",
+        "private double GapSeconds", "private double RealizedFor", "private double PeakRealizedFor", "private int LossStreakFor",
+        "private DateTime LossCooldownUntilFor", "private QualityState QualityFor", "private static bool ConnectionShouldLatch",
+        "private static string ProtectiveLock",
         "private string SizingArm", "private SizingState SizingFor", "private static SizingState AdaptiveSize", "private static int BudgetQuantity",
         "private static void ValidateSizingHistory", "private void LoadResults",
         "private static string ResolveCalendarPath",
@@ -64,6 +75,7 @@ def main():
     private int PaperContracts=1;
     private bool AdaptiveSizing=false;
     private int MaximumPaperContracts=10;
+    private int LossCooldownMinutes=30;
     private string riskLedgerPath;
     private System.Collections.Generic.List<ResultSample> results=new System.Collections.Generic.List<ResultSample>();
     private TimeZoneInfo easternZone=TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time");
@@ -79,6 +91,25 @@ def main():
     seeded = random.Random(7102026)
     values += ["".join(seeded.choices(string.ascii_letters + string.digits + " -#", k=seeded.randrange(24))) for _ in range(2000)]
     checks = []
+    checks.extend([
+        'day=new DateTime(2026,1,5);if(ProtectiveLock(-100,0,0,100,500,150,100,2,day,DateTime.MinValue)!="SESSION_LOSS_LOCK") throw new Exception("Session loss lock");',
+        'if(ProtectiveLock(500,500,0,100,500,150,100,2,day,DateTime.MinValue)!="SESSION_PROFIT_LOCK") throw new Exception("Session profit lock");',
+        'if(ProtectiveLock(100,250,0,100,500,150,100,2,day,DateTime.MinValue)!="PROFIT_GIVEBACK_LOCK") throw new Exception("Profit giveback lock");',
+        'if(ProtectiveLock(0,0,2,100,500,150,100,2,day,DateTime.MinValue)!="LOSS_STREAK_LOCK") throw new Exception("Loss streak lock");',
+        'if(ProtectiveLock(0,0,1,100,500,150,100,2,day,day.AddMinutes(1))!="POST_LOSS_COOLDOWN") throw new Exception("Loss cooldown");',
+        'if(ProtectiveLock(0,0,0,100,500,150,100,2,day,DateTime.MinValue)!="") throw new Exception("Clear protective state");',
+        '''{
+            var saved=results;results=new List<ResultSample>();
+            results.Add(new ResultSample {Id="r1",Arm="RISK:R2_RTH",Net=200,ClosedAt=day.AddHours(1)});
+            results.Add(new ResultSample {Id="l1",Arm="LEARNING:R2_RTH",Net=200,ClosedAt=day.AddHours(1)});
+            results.Add(new ResultSample {Id="r2",Arm="RISK:R2_RTH",Net=-80,ClosedAt=day.AddHours(2)});
+            results.Add(new ResultSample {Id="l2",Arm="LEARNING:R2_RTH",Net=-80,ClosedAt=day.AddHours(2)});
+            if(RealizedFor(day,day.AddHours(3))!=120 || PeakRealizedFor(day,day.AddHours(3))!=200
+                || LossStreakFor(day,day.AddHours(3))!=1 || LossCooldownUntilFor(day,day.AddHours(3))!=day.AddHours(2).AddMinutes(30))
+                throw new Exception("Protective history reconstruction");
+            results=saved;
+        }''',
+    ])
     for value in values:
         checks.append(f"if(MnqContractKey({json.dumps(value)})!={json.dumps(contract_key(value))}) throw new Exception(\"Contract key mismatch\");")
     for left, right in pairs:

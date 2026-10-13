@@ -1,7 +1,7 @@
 # Adaptive MNQ paper sizing
 
-Two contracts is a starting quantity. This R2 experiment can automatically
-increase it toward a selected maximum of ten and reduce it when evidence or
+One contract is the revised starting quantity. This R2 experiment can automatically
+increase it toward a selected maximum of three and reduce it when evidence or
 the remaining loss budget calls for a smaller position. It changes quantity
 only for a new entry; it never adds to an open or losing position.
 
@@ -15,11 +15,14 @@ reviewed calendar, history and other R2 guards described there.
 | --- | --- |
 | Account / Account stage | Sim101 / Funded |
 | Strategy arm / R2 exit profile | R2 / TrendRunner |
-| Paper contracts (R2 only) | 2: the starting evidence quantity |
+| Paper contracts (R2 only) | 1: the starting evidence quantity |
 | R2 adaptive paper sizing | True |
-| R2 maximum paper contracts | 10 |
+| R2 maximum paper contracts | 3 |
 | Allow historical orders | False |
 | Session loss limit | Your explicit paper loss allowance; default $100 |
+| Session profit lock | $500 |
+| Profit giveback protection | Activate at +$150; lock after $100 giveback |
+| Consecutive losses / cooldown | Lock after 2; wait 30 minutes after a loss |
 
 ## Evidence rules
 
@@ -43,9 +46,9 @@ can earn **one additional contract** if all these conditions hold:
   occurred since a sizing reduction.
 
 This is a frozen paper policy, not statistically established confidence. A
-strong uninterrupted record can move 2→3 after 20, 3→4 after 40, and toward 10
-after 160 qualifying outcomes. It does not promise that those outcomes will
-occur. No future, open or same-timestamp closing outcome can influence an entry.
+strong uninterrupted record can move 1→2 after 20 and 2→3 after 40 qualifying
+outcomes. It does not promise that those outcomes will occur. No future, open or
+same-timestamp closing outcome can influence an entry.
 
 ## Automatic reductions
 
@@ -54,8 +57,14 @@ floor of one. Additional consecutive losses reduce it by one each. A completed
 faulted trade also halves it and cannot help earn a promotion. Once a full
 20-position window has nonpositive net or at least 3R drawdown, entering that
 weak-performance state halves size once; continued weakness cannot earn growth.
-A new reduction restarts the five-completion growth cooldown. A single normal
-loss in a profitable record need not reduce size.
+A new reduction restarts the five-completion growth cooldown. Independently,
+the next eligible position after any loss is forced to 1 MNQ, entries pause for
+30 minutes, and two consecutive losses lock the session.
+
+Once realized session profit reaches $150, giving back $100 locks new entries.
+Reaching $500 also locks the session. These controls specifically prevent a
+profitable session from turning into a large losing session through continued
+full-size entries.
 
 For every new entry, actual quantity is the smaller of the evidence quantity
 and the number that fits:

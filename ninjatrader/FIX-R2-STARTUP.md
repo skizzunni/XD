@@ -38,7 +38,7 @@ files and existing trade/risk records.
    | Research → Paper run ID | The exact run ID entered in the launcher |
    | Data → Frozen calendar CSV | The exact installed **MNQCalendar-R2.csv** path printed by the launcher |
    | R2 adaptive paper sizing | **True** |
-   | Paper contracts / maximum paper contracts | **2 / 10** |
+   | Paper contracts / maximum paper contracts | **1 / 3** |
    | Platform display time zone ID | **Eastern Standard Time** |
    | Allow historical orders | **False** |
 

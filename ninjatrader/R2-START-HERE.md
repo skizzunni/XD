@@ -52,10 +52,13 @@ strategy installation. NinjaTrader still needs F5 and the settings below.
    | Use break-even protection | **True** |
    | Maximum tick gap | **90 seconds** |
    | R2 exit profile | **Fixed** for the baseline, or **TrendRunner** for the new longer-trend paper test |
-   | Paper contracts (R2 only) | **2** for the requested larger paper test; selectable **1–10** |
+   | Paper contracts (R2 only) | **1** initially; do not override the loss-reduction rule |
    | R2 adaptive paper sizing | **True** to adjust quantity from completed outcomes; **False** retains fixed quantity |
-   | R2 maximum paper contracts | **10**, or your chosen maximum at least as large as the starting quantity |
-   | Session loss limit and fees | Your chosen loss budget; default $100. The supplied statement shows **$1.50 per MNQ round trip**; verify your own account's costs |
+   | R2 maximum paper contracts | **3** until the revised forward-test gates pass |
+   | Session loss limit / profit lock | **$100 / $500** |
+   | Profit protection activation / maximum giveback | **$150 / $100** |
+   | Maximum consecutive losses / cooldown | **2 / 30 minutes** |
+   | Fees | Default **$1.50 per MNQ round trip**; verify your own Sim101 cost model |
 
    The existing saved P0/R1 instances retain their settings after a source update;
    selecting R2 explicitly is required. The orange “Primary series must be

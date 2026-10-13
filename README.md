@@ -39,16 +39,17 @@ Funded/Evaluation is a selectable paper risk profile; data access is separate.
 The older **R2 full-session scanner** remains the Windows Sim101 default. It scans reviewed
 CME sessions overnight and during the day, with separate rules and bounded
 quality learning for each profile. It has no daily trade-count cap and keeps
-one open position, with selectable 1–10 paper contracts. Start with [the R2 install guide](ninjatrader/R2-START-HERE.md)
+one open position, with selectable 1–3 paper contracts under the revised risk policy. Start with [the R2 install guide](ninjatrader/R2-START-HERE.md)
 and [the full rules](ninjatrader/R2-FULL-SESSION.md). **R1** retains its cash-session
 experiment; **P0 session-open momentum** and **C1 fair value gap** preserve the
 original single-entry plan for comparison. Native routing accepts simulated
 accounts only.
 
-The [adaptive sizing experiment](ninjatrader/R2-ADAPTIVE-SIZING.md) starts at
-**2 contracts** and can grow toward **10** from completed, risk-normalized
-results, with automatic reductions after loss streaks and weak performance.
-Set **R2 adaptive paper sizing=True**, **R2 maximum paper contracts=10** and
+The [adaptive sizing experiment](ninjatrader/R2-ADAPTIVE-SIZING.md) now starts at
+**1 contract** and can grow toward **3** from completed, risk-normalized
+results, with automatic reductions after losses, a 30-minute cooldown, a
+two-loss session lock and profit-giveback protection.
+Set **R2 adaptive paper sizing=True**, **R2 maximum paper contracts=3** and
 **R2 exit profile=TrendRunner**. Every setup still fits the explicit remaining
 loss budget, so it may use fewer contracts. The
 [fixed exit/size comparison](ninjatrader/R2-EXIT-EXPERIMENT.md) remains available.

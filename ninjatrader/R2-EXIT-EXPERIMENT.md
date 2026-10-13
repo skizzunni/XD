@@ -11,7 +11,7 @@ adds **R2 exit profile=TrendRunner** as a separate paper experiment.
 | Overnight holding limit | 20 minutes | 45 minutes |
 | Profit limit | 1.5R daytime / 1.25R overnight | No fixed profit limit |
 | Profit trailing stop | None | Starts after observed 1.5R; follows one initial R behind the best executable quote |
-| Paper quantity | Selected 1–10 MNQ | Selected 1–10 MNQ |
+| Paper quantity | Selected 1–3 MNQ | Selected 1–3 MNQ |
 
 Both use the same initial protective stop, cost/risk checks, optional cost-aware
 break-even stop, news pauses and pre-close flattening. A trailing stop only
@@ -22,8 +22,8 @@ Gaps can still fill worse than the stop and can exceed the loss budget.
 Use a fresh **r2-runner-sim101-001** run ID (or another unused ID), select
 **R2 exit profile=TrendRunner**, and match that ID in the launcher. Native risk
 remains shared across this bot's runs; runner learning is stored separately from
-fixed-exit learning. Start at **Paper contracts=2** with the current $100 session
-budget. The default native quantity remains one until explicitly selected.
+fixed-exit learning. Start at **Paper contracts=1**, keep adaptive sizing enabled
+and cap it at 3 with the current $100 session budget.
 Larger sizes must fit the full planned stop and fees within the remaining
 budget; the bot does not silently raise that budget. Partial fills of the same
 entry order are aggregated, and partial exits make one closed trade and one

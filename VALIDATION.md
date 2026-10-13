@@ -1,5 +1,15 @@
 # Implementation review and validation
 
+The revised NinjaTrader Sim101 policy was derived from a private 26-row
+Tradovate/TAKEPROFIT export that reconciled to 21 positions and -$2,470.50 net.
+The two PRO-labeled accounts lost $2,950 across five 10-MNQ positions, including
+three losing shorts within 55 minutes and duplicated 10-MNQ exposure across two
+accounts. The source now defaults to 1 MNQ, adaptive maximum 3, a $100 session
+loss lock, $500 profit lock, $150/$100 profit activation/giveback, 30-minute
+post-loss cooldown, forced 1-MNQ next size and a two-loss session lock. The
+uploaded export and private review remain outside Git. These changes address
+demonstrated risk behavior; they do not establish signal profitability.
+
 The Topstep rebuild adds a stdlib ProjectX REST client with order writes off by
 default, a cost-aware 50K Standard Trading Combine risk gate, an append-only
 completed-bar collector and a manual-position analyzer. Eleven focused tests cover
@@ -145,7 +155,7 @@ launchers and actual account/data entitlements still require local acceptance.
 - Python compilation and unused/unbound-name analysis passed.
 - C# grammar parsing passed; this does not verify NinjaTrader API bindings.
 - The actual C# contract helpers were extracted, compiled with a checksum-verified
-  .NET 8 SDK and exercised against 8,227 cases, including all quarterly expiries,
+  .NET 8 SDK and exercised against 8,234 cases, including all quarterly expiries,
   wrong years/products and seeded invalid identifiers, plus actual extracted
   session, learning and calendar-loader methods. Boundary assertions check
   futures dates, break/close deadlines, profile learning and connection-startup
